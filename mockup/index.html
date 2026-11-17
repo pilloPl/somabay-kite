@@ -31,6 +31,12 @@
   .card .ph{display:flex;align-items:center;justify-content:center;background:#2a4450;font-weight:700;font-size:18px}
   .card b{display:block;font-size:13px}
   .card small{opacity:.75}
+  #uiToggle{display:none;position:fixed;top:10px;left:10px;z-index:7;background:#d9822b;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-size:14px}
+  @media (max-width: 760px){ #ui{font-size:11px;max-width:250px;top:46px} #uiToggle{display:block} #ui.hide{display:none} #team{width:260px} }
+  .bub{position:absolute;transform:translate(-50%,-100%);background:#fff;color:#1a1a1a;font:600 12px system-ui,-apple-system,sans-serif;padding:5px 9px;border-radius:12px;max-width:220px;box-shadow:0 2px 8px rgba(0,0,0,.35);text-align:center}
+  .bub:after{content:'';position:absolute;left:50%;bottom:-7px;margin-left:-6px;border:6px solid transparent;border-top-color:#fff;border-bottom:0}
+  .bub.angry{background:#ffe1dc;color:#9a1b0e}.bub.angry:after{border-top-color:#ffe1dc}
+  .bub.think{background:#eef3ff;border-radius:20px;font-style:italic;color:#2b3a55}.bub.think:after{width:9px;height:9px;border:0;border-radius:50%;background:#eef3ff;bottom:-12px;margin-left:-5px}
   #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;background:#0d1b22;z-index:9}
 </style>
 <script type="importmap">
@@ -42,6 +48,7 @@
 <div id="labels"></div>
 <div id="team"><h2>Ekipa Surfmotion</h2><div id="cards"></div><div class="note">Zdjęcia: oficjalna lista zespołu surfmotion.com. Kliknij osobę, żeby ją pokazać na mapie.</div></div>
 <div id="loading">Buduję świat Soma Bay…</div>
+<button id="uiToggle">☰</button>
 <div id="ui">
   <h1>Soma Bay · Surfmotion (makieta 3D, 1 m = 1 m)</h1>
   <div>Układ z pomiarów satelity (7,8 px/m) + poprawki z wizyty. Wiatr N. Kity: flota Core + goście.</div>
@@ -70,6 +77,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 // Świat w metrach: x = wschód, z = południe, y = góra. Średni poziom morza = 0.
 // =====================================================================
 const V3 = THREE.Vector3, TAU = Math.PI * 2, LAND = 0.42;
+// telefon / tablet: mniej pamięci GPU (iOS ubija stronę przy tekstur 2K + dużej mapie cieni)
+const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(innerWidth, innerHeight) < 900);
 
 // ---------- szum, losowość ----------
 function hash(x, y) { let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
@@ -111,8 +120,8 @@ const GX0 = -110, GX1 = 430, GZ0 = -90, GZ1 = 310, GNX = GX1 - GX0, GNZ = GZ1 - 
 // Renderer, scena, kamera
 // =====================================================================
 const app = document.getElementById('app');
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+const renderer = new THREE.WebGLRenderer({ antialias: !MOBILE });
+renderer.setPixelRatio(Math.min(devicePixelRatio, MOBILE ? 1.25 : 1.75));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -152,7 +161,7 @@ function setWind(deg, kn) {
 setWind(345, 18);
 const AO_HIDE = [];   // obiekty pomijane przy liczeniu cieniowania otoczenia (przezroczyste, alfa)
 const sun = new THREE.DirectionalLight(0xfff0db, 3.1);
-sun.castShadow = true; const SHADOW = Math.min(8192, renderer.capabilities.maxTextureSize); sun.shadow.mapSize.set(SHADOW, SHADOW); sun.shadow.bias = -0.0003;
+sun.castShadow = true; const SHADOW = MOBILE ? 2048 : Math.min(8192, renderer.capabilities.maxTextureSize); sun.shadow.mapSize.set(SHADOW, SHADOW); sun.shadow.bias = -0.0003;
 scene.add(sun, sun.target);
 const hemi = new THREE.HemisphereLight(0xd4e6ff, 0xe2cba0, .55); scene.add(hemi);
 // pora dnia (minuty od północy). Soma Bay w listopadzie: wschód ~6:10, zachód ~17:05, słońce w południe ~45°
@@ -420,7 +429,7 @@ const M = {
 
 // ---------- prawdziwe tekstury CC0: Poly Haven + ambientCG (assets/tex/<id>/diff|nor|rough.jpg) ----------
 const manager = new THREE.LoadingManager(), TL = new THREE.TextureLoader(manager);
-function ptex(id, kind, rep = 1) { const t = TL.load(`assets/tex/${id}/${kind}.jpg`); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = ANISO; t.repeat.set(rep, rep); if (kind === 'diff') t.colorSpace = THREE.SRGBColorSpace; return t; }
+function ptex(id, kind, rep = 1) { const t = TL.load(`assets/tex/${id}/${kind}${MOBILE ? '_1k' : ''}.jpg`); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = ANISO; t.repeat.set(rep, rep); if (kind === 'diff') t.colorSpace = THREE.SRGBColorSpace; return t; }
 const PBR = (id, rep = 1) => ({ map: ptex(id, 'diff', rep), normalMap: ptex(id, 'nor', rep), roughnessMap: ptex(id, 'rough', rep), roughness: 1 });
 Object.assign(M.thatch, PBR('ThatchedRoof001A'), { normalScale: new THREE.Vector2(1.3, 1.3) }); M.thatch.color.set(0xf4dfb8);
 Object.assign(M.slab, PBR('concrete_floor_worn_001', 4 / 3)); M.slab.color.setRGB(1.3, 1.24, 1.14);
@@ -446,7 +455,7 @@ for (const [k, path] of [['man', 'people/man.glb'], ['woman', 'people/woman.glb'
   ['shrub', 'shrub_02/shrub_02_1k.gltf'], ['box', 'cardboard_box_01/cardboard_box_01_1k.gltf'], ['tableset', 'outdoor_table_chair_set_01/outdoor_table_chair_set_01_1k.gltf']])
   GL.load('assets/models/' + path, g => { MODELS[k] = g; });
 const skyUni = { value: new THREE.DataTexture(new Uint8Array([150, 190, 235, 255]), 1, 1) }; skyUni.value.needsUpdate = true;
-new RGBELoader(manager).load('assets/hdri/sky.hdr', t => { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromEquirectangular(t).texture; pm.dispose(); skyUni.value = t; });
+if (!MOBILE) new RGBELoader(manager).load('assets/hdri/sky.hdr', t => { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromEquirectangular(t).texture; pm.dispose(); skyUni.value = t; });
 
 // =====================================================================
 // Geometria pomocnicza + „kubełki” scalane w jedną siatkę na materiał
@@ -762,11 +771,14 @@ function personGeom(p, pose = 'stand') {
   return mergeGeometries(parts, false);
 }
 const MIXERS = [], ACCS = [];
-const CLIPS = { man: { stand: 'HumanArmature|Man_Idle', walk: 'HumanArmature|Man_Walk', sit: 'HumanArmature|Man_Sitting', ride: 'HumanArmature|Man_Standing' },
-  woman: { stand: 'Armature|Idle', walk: 'Armature|Walking', sit: 'Armature|SitIdle', ride: 'Armature|Idle' } };
+const CLIPS = { man: { stand: 'HumanArmature|Man_Idle', walk: 'HumanArmature|Man_Walk', sit: 'HumanArmature|Man_Sitting', ride: 'HumanArmature|Man_Standing', angry: 'HumanArmature|Man_Punch' },
+  woman: { stand: 'Armature|Idle', walk: 'Armature|Walking', sit: 'Armature|SitIdle', ride: 'Armature|Idle', angry: 'Armature|Punch' } };
 // dodatki przypięte do głowy: czapka, okulary, broda, aparat
 function accessoryGeom(p) {
   const parts = [], add = (g, hex, x, y, z, sx = 1, sy = 1, sz = 1) => { xf(g, x, y, z, 0, 0, 0, sx, sy, sz); paint(g, hex); parts.push(g.index ? g.toNonIndexed() : g); };
+  if (p.cig) { add(cyl(.006, .006, .08, 6).rotateZ(Math.PI / 2), 0xf4f4f0, .04, -.05, .14); add(cyl(.0065, .0065, .012, 6).rotateZ(Math.PI / 2), 0xff6a20, .085, -.05, .14); }
+  if (p.helmet) add(new THREE.SphereGeometry(.15, 14, 8, 0, TAU, 0, Math.PI / 2), p.helmet, 0, .02, 0);
+  if (p.longHair) { add(cap(.1, .32), p.hair, 0, -.2, -.1, 1.35, 1, .75); for (const sx of [-1, 1]) add(cap(.035, .28), p.hair, sx * .1, -.17, -.02); }
   if (p.cap) { add(cyl(.13, .13, .08, 14), p.cap, 0, .12, 0); add(box(.18, .02, .12), p.capBrim || p.cap, 0, .09, p.capBack ? -.17 : .17); }
   if (p.shadesOnHead) add(box(.24, .03, .06), 0x0e0e10, 0, .15, .07);
   if (p.glasses) add(box(.2, .04, .04), p.glasses, 0, .03, .12);
@@ -790,7 +802,7 @@ function character(p, pose = 'stand') {
   const mixer = new THREE.AnimationMixer(root), clip = THREE.AnimationClip.findByName(src.animations, CLIPS[kind][pose] || CLIPS[kind].stand);
   if (clip) { const a = mixer.clipAction(clip); a.play(); a.time = R(0, clip.duration); mixer.timeScale = R(.85, 1.1); }
   MIXERS.push(mixer); grp.userData.mixer = mixer;
-  const ag = accessoryGeom(p); if (ag && head) { const am = new THREE.Mesh(ag, M.vc); am.castShadow = true; scene.add(am); ACCS.push({ am, head, grp }); }
+  const ag = accessoryGeom(p); if (ag && head) { const am = new THREE.Mesh(ag, M.vc); am.castShadow = true; scene.add(am); ACCS.push({ am, head, grp, loose: !!p.helmetLoose }); }
   return grp;
 }
 function setAnim(grp, pose) { const mx = grp.userData.mixer; if (!mx || grp.userData.pose === pose) return; grp.userData.pose = pose; const root = mx.getRoot(), kind = root.getObjectByName('Woman') ? 'woman' : 'man', src = MODELS[kind], clip = THREE.AnimationClip.findByName(src.animations, CLIPS[kind][pose]); if (!clip) return; mx.stopAllAction(); mx.clipAction(clip).play(); }
@@ -802,7 +814,7 @@ function staticPerson(p, pose, x, y, z, ry = 0, rx = 0) {
 // ekipa (dopasowanie zdjęć z oficjalnej listy zespołu + wskazówki Kuby)
 const TEAM = {
   Peter: { skin: 0xe6b894, shirt: 0x7d8a9a, hair: 0xa8a8a8, shorts: 0x2a2a2e, beard: 0x9a9a9a, shadesOnHead: true },
-  Petra: { skin: 0xecc9ab, shirt: 0xffffff, hair: 0xb89a6a, shorts: 0x22324a, hairStyle: 'long' },
+  Petra: { female: true, skin: 0xecc9ab, shirt: 0x7a3fb0, hair: 0x6e1a2a, shorts: 0x22324a, longHair: true, cig: true },
   HassanOffice: { skin: 0xa8734f, shirt: SM_CYAN, hair: 0x141414, shorts: 0x2a2a2e, hairStyle: 'curly', beard: 0x141414, build: 1.35 },
   Mahmoud: { skin: 0x9a6b4c, shirt: SM_CYAN, hair: 0x8a8a8a, shorts: 0x2a2a2e, beard: 0x8a8a8a, glasses: 0x8a5a20 },
   Moktar: { skin: 0xa8734f, shirt: SM_CYAN, hair: 0x141414, shorts: 0x1e1e22, cap: 0x8a8e94, capBack: true, shadesOnHead: true, build: 1.45 },
@@ -869,6 +881,7 @@ function boatGeom(L, W, hull, inside, tubes) {
 // =====================================================================
 // BUDOWA ŚWIATA (wg pomiarów satelity)
 // =====================================================================
+const PATROL = { m: null, home: null, state: 'home', a: 0, x: 195.5, z: 100, ry: -1.3, shout: 0 };
 const SEATS = [[167.6, 57.2, 2.6], [168.6, 58.2, 2.9], [172.6, 58.1, -2.8], [173.6, 57.3, -2.5], [169.4, 56.4, 3.1], [171.9, 56.3, -3]];
 const FLAGS = [], FLOATERS = [], BUOYS = [], PUDDLES = [], PARKED = [], PALM_POS = [], BULB_MAT = [], NIGHT_LIGHTS = [], CHILL_BENCH = [], TOWER = [188.6, 30.9];
 // samochód (przód w +x): osobowy, SUV, pickup (auto stacji), bus
@@ -1318,7 +1331,7 @@ function buildWorld() {
   }
 
   // ---------- RIB-y, platforma, boje stref ----------
-  for (const [x, z, r] of [[195.5, 100, -1.3], [198, 104, -1.15]]) { const m = new THREE.Mesh(boatGeom(5, 2.1, 0x60626a, 0x8c8e94, 0xf06e28), M.vc); m.position.set(x, 0, z); m.rotation.y = r; m.castShadow = true; scene.add(m); FLOATERS.push({ m, x, z, minY: heightAt(x, z), ph: R(0, 6) }); }
+  for (const [x, z, r] of [[195.5, 100, -1.3], [198, 104, -1.15]]) { const m = new THREE.Mesh(boatGeom(5, 2.1, 0xf2f2f0, 0xd8dce0, 0xf6f6f4), M.vc); m.position.set(x, 0, z); m.rotation.y = r; m.castShadow = true; scene.add(m); if (!PATROL.m) { PATROL.m = m; PATROL.home = [x, z, r]; continue; } FLOATERS.push({ m, x, z, minY: heightAt(x, z), ph: R(0, 6) }); }
   { const x = 236, z = 128; base.add('wood', xf(boxT(7, .16, 5, 2), x + 3.5, .9, z + 2.5)); for (const [dx, dz] of [[0, 0], [7, 0], [0, 5], [7, 5], [3.5, 0], [3.5, 5]]) base.add('wood', xf(boxT(.2, 2.4, .2, 1), x + dx, -.3, z + dz));
     roofB.add('fabric', xf(new THREE.PlaneGeometry(6.4, 3.2), x + 3.4, 3.1, z + 1.8, 0, -Math.PI / 2 + .08)); for (const [dx, dz] of [[.3, .2], [6.7, .2], [.3, 3.4], [6.7, 3.4]]) base.add('wood', xf(boxT(.1, 2.2, .1, 1), x + dx, 2, z + dz)); }
   // strefa wind/wing tuż przy bazie (żółte boje), kite od pasów w dół i na zewnątrz (czerwona linia)
@@ -1348,7 +1361,7 @@ function buildWorld() {
     const g = carGeom(type, c); xf(g, x, heightAt(x, z), z, ry); base.add('vcGloss', g);
   }
   // ---------- kamienie: plaża, strefa pływów (widoczne przy odpływie), przy falochronie ----------
-  { S(230); const sg = new THREE.IcosahedronGeometry(1, 0), N = 5200, im = new THREE.InstancedMesh(sg, std({ color: 0xffffff, roughness: .9, flatShading: true }), N);
+  { S(230); const sg = new THREE.IcosahedronGeometry(1, 0), N = MOBILE ? 1500 : 5200, im = new THREE.InstancedMesh(sg, std({ color: 0xffffff, roughness: .9, flatShading: true }), N);
     let n = 0;
     while (n < N) {
       const r = rnd(); let x, z, s;
@@ -1368,7 +1381,7 @@ function buildWorld() {
     for (let i = 0; i < 420; i++) { const a = R(0, TAU), L = R(30, 120), k = R(.7, 1.15), dry = rnd() < .75; g.strokeStyle = dry ? `rgb(${190 * k | 0},${165 * k | 0},${110 * k | 0})` : `rgb(${110 * k | 0},${130 * k | 0},${70 * k | 0})`; g.lineWidth = R(1.5, 3.5); g.beginPath(); g.moveTo(128, 128); g.quadraticCurveTo(128 + Math.cos(a) * L * .5 + R(-10, 10), 128 + Math.sin(a) * L * .5 + R(-10, 10), 128 + Math.cos(a) * L, 128 + Math.sin(a) * L); g.stroke(); }
     const tm = std({ map: toTex(c, true, false), alphaTest: .4, side: THREE.DoubleSide, roughness: .95 });
     const tg = mergeGeometries([new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, .12, 0), new THREE.PlaneGeometry(1, .6).translate(0, .3, 0), new THREE.PlaneGeometry(1, .6).translate(0, .3, 0).rotateY(Math.PI / 2)]);
-    const N = 1400, im = new THREE.InstancedMesh(tg, tm, N); let n = 0, tries = 0;
+    const N = MOBILE ? 400 : 1400, im = new THREE.InstancedMesh(tg, tm, N); let n = 0, tries = 0;
     while (n < N && tries++ < 20000) {
       const x = R(-40, 200), z = R(-40, 250), h = heightAt(x, z);
       if (h < .3) continue;
@@ -1427,6 +1440,48 @@ function lines(n) { const g = new THREE.BufferGeometry(); g.setAttribute('positi
 function personMesh(p, pose) { const c = character(p, pose); if (c) { scene.add(c); return c; } const m = new THREE.Mesh(personGeom(p, pose), M.vc); m.castShadow = true; m.receiveShadow = true; scene.add(m); return m; }
 // jeździec: środek pasa + oś w poprzek wiatru (u) + lekki dryf z wiatrem; zawraca na płyciźnie
 function riderPos(r, t, u) { const d = Math.sin(t * r.f + r.ph) * r.drift; return [r.cx + wind.side.x * u + wind.down.x * d, r.cz + wind.side.z * u + wind.down.z * d]; }
+// ---------- kiter wpływa do strefy wind: klakson z bazy (max raz na 30 s), a jak nie wypływa — ponton krąży i krzyczy ----------
+const ZONE = { line: 100, next: 20, k: null, inT: 0, honked: false, amrT: 0, amr: null, boat: null };
+let AC = null;
+addEventListener('pointerdown', () => { try { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); AC.resume(); } catch (e) {} });
+addEventListener('keydown', () => { try { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); AC.resume(); } catch (e) {} });
+function trainHorn() {
+  if (!AC) return;
+  for (const [st, len] of [[0, 1.1], [1.35, 1.7]]) {                  // dwa trąbnięcia jak pociąg
+    const t0 = AC.currentTime + st, g = AC.createGain(), lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1600;
+    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(.16, t0 + .07); g.gain.setValueAtTime(.16, t0 + len - .25); g.gain.linearRampToValueAtTime(0, t0 + len); g.connect(lp).connect(AC.destination);
+    for (const f of [277.2, 349.2, 415.3]) { const o = AC.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f * .97, t0); o.frequency.linearRampToValueAtTime(f, t0 + .18); o.connect(g); o.start(t0); o.stop(t0 + len + .05); }
+  }
+}
+const SHOUTS = ['Hej! To strefa WIND!', 'Wypływaj! Kite jest tam! ⬆', 'Yalla, yalla — go north!', 'Mister! Out of windsurf zone!', 'Haloooo! Linki! Uważaj!'];
+function updateZone(dt, t) {
+  const kiters = dyn.kiters.filter(k => k.grp.visible && !k.name);
+  ZONE.next -= dt;
+  if (!ZONE.k && ZONE.next <= 0 && kiters.length) { const k = pick(kiters); ZONE.k = k; k.czHome = k.cz; k.czT = ZONE.line + R(8, 16); k.stay = R(4, 16); ZONE.inT = 0; ZONE.honked = false; ZONE.next = 30; }
+  for (const k of dyn.kiters) if (k.czT !== undefined) { k.cz += (k.czT - k.cz) * Math.min(1, dt * .35); }
+  const k = ZONE.k;
+  if (k) {
+    const z = k.grp.position.z, inside = z > ZONE.line + 1;
+    if (inside) { ZONE.inT += dt; if (!ZONE.honked) { ZONE.honked = true; trainHorn(); ZONE.amrT = 3.2; } }
+    if (inside && ZONE.inT > k.stay) { k.czT = k.czHome; }                                      // w końcu wypływa
+    if (inside && ZONE.inT > 6 && PATROL.state === 'home') PATROL.state = 'go';                  // nie wypływa → ponton
+    if (!inside && ZONE.inT > 0 && Math.abs(k.cz - k.czHome) < 1) { k.czT = undefined; ZONE.k = null; if (PATROL.state !== 'home') PATROL.state = 'back'; }
+  }
+  ZONE.amrT -= dt; if (ZONE.amr) ZONE.amr.text = ZONE.amrT > 0 ? 'TUUUUT! TUUUUUUT! 🚂' : '';
+  // ponton: płynie do intruza, krąży wokół i krzyczy; potem wraca
+  const P = PATROL; if (!P.m) return;
+  if (P.state === 'home') { P.x = P.home[0]; P.z = P.home[1]; P.ry = P.home[2]; }
+  else {
+    let tx, tz;
+    if (P.state === 'back' || !ZONE.k) { [tx, tz] = P.home; P.state = 'back'; }
+    else { P.a += dt * .55; const kp = ZONE.k.grp.position; tx = kp.x + Math.cos(P.a) * 11; tz = kp.z + Math.sin(P.a) * 11; if (P.state === 'go' && Math.hypot(tx - P.x, tz - P.z) < 4) P.state = 'circle'; }
+    const dx = tx - P.x, dz = tz - P.z, d = Math.hypot(dx, dz), sp = Math.min(d, (P.state === 'circle' ? 9 : 11) * dt);
+    if (d > .05) { P.x += dx / d * sp; P.z += dz / d * sp; const want = Math.atan2(-dz, dx); let da = want - P.ry; da = Math.atan2(Math.sin(da), Math.cos(da)); P.ry += da * Math.min(1, dt * 3); }
+    if (P.state === 'back' && d < .5) P.state = 'home';
+  }
+  P.m.position.set(P.x, Math.max(uLevel.value, heightAt(P.x, P.z)) + Math.sin(t * 1.4) * .05, P.z); P.m.rotation.y = P.ry; P.m.rotation.z = P.state === 'home' ? 0 : Math.sin(t * 2) * .05;
+  if (ZONE.boat) ZONE.boat.text = (P.state === 'circle' || P.state === 'go') ? SHOUTS[Math.floor(t / 2.6) % SHOUTS.length] : '';
+}
 function moveRider(r, dt, t, minD) {
   const nu = r.u + r.dir * r.v * (.6 + .4 * wind.kn / 18) * dt, np = riderPos(r, t, nu);
   if (Math.abs(nu) > r.L || depthAt(np[0], np[1]) < minD) r.dir = -r.dir; else r.u = nu;
@@ -1442,10 +1497,13 @@ function spawnDynamic() {
   S(500);
   for (let i = 0; i < 12; i++) {
     const k = { cx: R(226, 285), cz: R(36, 95), u: R(-30, 30), L: 40, drift: 6, dir: rnd() < .5 ? 1 : -1, v: R(7, 11), f: R(.05, .12), ph: R(0, 6), ko: 0, kite: pickKite(.5), span: R(8, 11), wake: new Wake(), tt: 0 };
-    k.grp = new THREE.Group(); k.body = personMesh(randPerson(true), 'ride'); scene.remove(k.body); k.board = gearBoard('twin');
+    k.grp = new THREE.Group(); k.body = personMesh(i === 1 ? IWONA : i === 2 ? JASIU : randPerson(true), 'ride'); scene.remove(k.body); k.board = gearBoard('twin');
     k.grp.add(k.body, k.board); k.grp.rotation.order = 'YXZ'; scene.add(k.grp);
+    if (i === 1) { k.name = 'Iwona'; k.cx = shoreX(62) + 27; k.cz = 62; k.L = 9; k.v = 4.5; k.drift = 1.5; dyn.npcs.push({ name: 'Iwona (klientka)', obj: k.body }); TALK.iwona = k.body; TALK.bI = bubble(k.body); k.splash = mkSplash(); }
+    if (i === 2) { k.name = 'Jasiu'; k.cx = 248; k.cz = 48; dyn.npcs.push({ name: 'Jasiu (klient)', obj: k.body }); k.splash = mkSplash(); }
     if (i === 0) { k.name = 'Krzysztof'; k.cz = 70; k.cx = 235; dyn.npcs.push({ name: 'Krzysztof (klient)', obj: k.body }); k.splash = new THREE.Mesh(new THREE.RingGeometry(.6, 1.6, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false })); k.splash.renderOrder = 2; scene.add(k.splash); AO_HIDE.push(k.splash); } k.kiteM = kiteMesh(k.kite, k.span, 'fly'); scene.add(k.kiteM); k.lines = lines(2); dyn.kiters.push(k);
   }
+  { const dd = personMesh(DIDA, 'stand'); dd.position.set(shoreX(62) + 21, 0, 64); TALK.dida = dd; TALK.bD = bubble(dd); dyn.npcs.push({ name: 'Dida (instruktorka)', obj: dd }); }
   // kursanci z instruktorami kite (flota Core)
   const INSTR = [['Ahmed — szef stacji', TEAM.Ahmed], ['Atamish', TEAM.Atamish], ['Moktar', TEAM.Moktar], ['Abdallah', TEAM.Abdallah], ['Khaled', TEAM.Khaled], ['Mahmoudi', TEAM.Mahmoudi]];
   for (let i = 0; i < INSTR.length; i++) {
@@ -1471,10 +1529,10 @@ function spawnDynamic() {
   // ekipa na lądzie
   const npc = (name, p, x, z, ry, pose = 'stand', y) => { const m = personMesh(p, pose); m.position.set(x, y ?? heightAt(x, z), z); m.rotation.y = ry; dyn.npcs.push({ name, obj: m }); };
   npc('Peter — szef', TEAM.Peter, 182.5, 47, -1.6);
-  npc('Petra — managerka', { female: true, ...TEAM.Petra }, 170.6, 54.1, 0);
   npc('Hassan — biuro', TEAM.HassanOffice, 168.9, 52.2, -Math.PI / 2, 'sit', LAND + .2);
   npc('Mahmoud — biuro', TEAM.Mahmoud, 171.4, 52.6, -2.2);
   npc('Amr — Baywatch', TEAM.Amr, TOWER[0], TOWER[1], -Math.PI / 2, 'stand', heightAt(TOWER[0], TOWER[1]) + 3.66);
+  ZONE.amr = bubble(dyn.npcs[dyn.npcs.length - 1].obj); ZONE.boat = bubble(PATROL.m, 'angry');
   npc('Abo Abdo — wypożyczalnia', TEAM.AboAbdo, 164.6, 52.4, Math.PI);
   npc('Halawany — wing / windsurf', TEAM.Halawany, 141.6, 50, Math.PI);
   { const f = new THREE.Object3D(); f.position.set(176, LAND, 43.5); scene.add(f); dyn.npcs.push({ name: 'Felix — kot stacji', obj: f }); }
@@ -1532,8 +1590,41 @@ function carryKite() { const g = new THREE.Group(), k = kiteMesh(pickKite(.85), 
 function carryBoard(ws) { const g = new THREE.Group(), b = ws ? new THREE.Mesh(wsBoardGeom(pick([0xf4f4f2, 0x1f78d6])), M.vc) : gearBoard('twin'); b.castShadow = true; b.rotation.set(0, Math.PI / 2, Math.PI / 2); b.position.set(.42, 1.05, 0); g.add(b);
   if (ws) { const sl = new THREE.Mesh(SAIL_G, pick(sailMats)); sl.castShadow = true; sl.rotation.set(-Math.PI / 2 + .25, 0, Math.PI / 2); sl.position.set(-.2, 2.05, 1.6); g.add(sl); } return g; }
 // plan pracy: kroki [cel, akcja, czas]; akcje: pick-kite / pick-board / pick-ws / drop / rinse / idle
-const MANIAS = { skin: 0xe2b896, shirt: 0x2d4f7a, hair: 0x3a2a1e, shorts: 0xd8d0b8, shadesOnHead: true }, BRAILI = { skin: 0xd9a77e, shirt: 0xd9a77e, hair: 0x5a3c23, shorts: 0xf2c81e };
+const IWONA = { female: true, skin: 0xecc9ab, shirt: 0x1e1e22, hair: 0x6b4a2a, shorts: 0x1e1e22, harness: true, helmet: 0xf2c81e, helmetLoose: true };
+const DIDA = { female: true, skin: 0xe2b896, shirt: 0x1e1e22, hair: 0x2a1c14, shorts: 0x1e1e22, longHair: true };
+const JASIU = { skin: 0xe6b894, shirt: 0x2a2e36, hair: 0xc8aa6e, shorts: 0x1e1e22, harness: true };
+const MAGDA = { female: true, skin: 0xecc9ab, shirt: 0xf2f2f2, hair: 0x5a3c23, shorts: 0x2d4f7a, longHair: true, shadesOnHead: true };
+// scenka: Dida uczy Iwonę skoku i się wkurza; Magda myśli tylko o Sycylii
+const TALK = { t: 0, i: 0, jumpT: -1 };
+const SCRIPT = [['dida', 'Iwona! Krawędź, napnij linki, bar do siebie i HOP!', 3.6, 'stand'], ['jump', '', 2.8], ['dida', 'No kurde, Iwona!!! Ile razy mam mówić — KRAWĘDŹ!', 3.2, 'angry'],
+  ['iwona', 'Skoczyłabyś!', 2.6], ['dida', 'Grrr… Dobra. Jeszcze raz. Od początku.', 3, 'stand'], ['pause', '', 2.5]];
+const SICILY = ['Sycylia… 🍋', 'Tani lot do Katanii w październiku?', 'San Vito Lo Capo — tam też wieje…', 'Cannoli, arancini, Etna… i wiatr', 'A może Marsala? Laguna jak tu…', 'Ile kosztuje kite bag w Ryanairze…', 'Palermo → Trapani autem, 1,5 h…'];
+const BUBBLES = [];
+function bubble(obj, cls = '') { const d = document.createElement('div'); d.className = 'bub ' + cls; d.style.display = 'none'; labelsEl.appendChild(d); const b = { obj, d, text: '' }; BUBBLES.push(b); return b; }
+function updateTalk(dt, t) {
+  if (!TALK.dida) return;
+  TALK.t += dt; const [who, text, dur, anim] = SCRIPT[TALK.i];
+  TALK.bD.text = who === 'dida' ? text : ''; TALK.bI.text = who === 'iwona' ? text : ''; TALK.bD.d.classList.toggle('angry', anim === 'angry');
+  if (who === 'dida' && TALK.didaAnim !== anim) { TALK.didaAnim = anim; setAnim(TALK.dida, anim); }
+  if (TALK.jumpT >= 0) TALK.jumpT += dt;
+  if (TALK.t >= dur) { TALK.t = 0; TALK.i = (TALK.i + 1) % SCRIPT.length; if (SCRIPT[TALK.i][0] === 'jump') TALK.jumpT = 0; }
+  if (TALK.jumpT > 3.4) TALK.jumpT = -1;
+  const D = TALK.dida, ip = TALK.iwona.getWorldPosition(new V3());
+  D.position.y = Math.max(heightAt(D.position.x, D.position.z), uLevel.value - .5); D.rotation.y = Math.atan2(ip.x - D.position.x, ip.z - D.position.z);
+  if (TALK.petra) {
+    const cough = (t % 7.3) < 1.4, ask = TALK.petra.acting === 'ask';
+    TALK.bP.text = cough ? '*khe… khe… KHE…* 🚬' : ask ? 'You registered with the group?' : '';
+    const P = SMOKE.p.geometry.attributes.position, h = new V3(); TALK.petra.m.getWorldPosition(h); const ry = TALK.petra.m.rotation.y; h.x += Math.sin(ry) * .2; h.z += Math.cos(ry) * .2; h.y += 1.55;
+    for (let i = 0; i < SMOKE.n; i++) { SMOKE.age[i] += dt; if (SMOKE.age[i] > 2.6) { SMOKE.age[i] -= 2.6; P.setXYZ(i, h.x, h.y, h.z); } else P.setXYZ(i, P.getX(i) + (wind.down.x * .5 + (Math.random() - .5) * .3) * dt, P.getY(i) + .35 * dt, P.getZ(i) + (wind.down.z * .5 + (Math.random() - .5) * .3) * dt); }
+    P.needsUpdate = true;
+  }
+  if (TALK.bM) TALK.bM.text = (t % 5.5) < 4.3 ? SICILY[Math.floor(t / 5.5) % SICILY.length] : '';
+}
+const SMOKE = (() => { const n = 46, g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3).fill(-999), 3)); const p = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xd4d4d4, size: .22, transparent: true, opacity: .32, depthWrite: false })); p.frustumCulled = false; scene.add(p); return { n, p, age: Float32Array.from({ length: n }, (_, i) => i / n * 2.6) }; })();
+function mkSplash() { const m = new THREE.Mesh(new THREE.RingGeometry(.6, 1.6, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false })); m.renderOrder = 2; scene.add(m); AO_HIDE.push(m); return m; }
+const MANIAS = { skin: 0xe2b896, shirt: 0x2d4f7a, hair: 0x3a2a1e, shorts: 0xd8d0b8, shadesOnHead: true }, BRAILI = { skin: 0xd9a77e, shirt: 0xd9a77e, hair: 0x5a3c23, shorts: 0xf2c81e, hairStyle: 'bald' };   // Brailey: łysy, tylko żółte spodenki
 const PLANS = {
+  petra: () => [['office', 'ask', R(3, 6)], ['bar1', 'ask', R(3, 5)], ['offseat', 'ask', R(3, 5)], ['chill', 'ask', R(3, 6)], ['lawnN', 'ask', R(3, 5)], ['kitestore', 'ask', R(2, 4)], ['photo1', 'ask', R(3, 5)], ['hallS', 'ask', R(3, 5)]],
   manias: () => [['photo1', 'idle', R(4, 9)], ['photo2', 'idle', R(3, 7)], ['photo1', 'idle', R(4, 8)], ['bar2', 'idle', R(3, 6)]],
   kite: () => [['kitestore', 'pick-kite', 1.5], ['lawnS', 'idle', 1], [() => [shoreX(92) + 5, 92 + R(-4, 4)], 'drop', 3], ['wash', 'rinse', 9], ['kitestore', 'idle', 2]],
   kite2: () => [['kitestore', 'pick-kite', 1.5], ['lawnM', 'idle', 1], [() => [shoreX(70) + 5, 70 + R(-4, 4)], 'drop', 3], ['washR', 'rinse', 8], ['kitestore', 'idle', 2]],
@@ -1546,12 +1637,14 @@ function spawnWorkers() {
   S(600);
   const crew = [['kite', TEAM.HassanBeach], ['kite2', { skin: 0x7d5238, shirt: SM_CYAN, hair: 0x141414, shorts: 0x22324a, cap: 0xffffff }], ['kite', { skin: 0x9a6b4c, shirt: SM_CYAN, hair: 0x141414, shorts: 0x1e1e22 }], ['ws', TEAM.Kamal], ['ws', TEAM.AhmedBeach], ['rinse', { skin: 0x7d5238, shirt: SM_CYAN, hair: 0x141414, shorts: 0x1e1e22, hairStyle: 'curly' }]];
   for (let i = 0; i < 7; i++) crew.push(['stroll', { tourist: true, ...randPerson() }]);
-  crew.push(['manias', MANIAS], ['stroll', BRAILI]);
+  crew.push(['manias', MANIAS], ['stroll', BRAILI], ['stroll', MAGDA], ['petra', TEAM.Petra]);
   for (const [plan, p] of crew) {
     const m = personMesh(p, 'walk'), st = POI[pick(Object.keys(POI))];
     const w = { m, plan, steps: PLANS[plan](), si: 0, path: null, pi: 0, x: st[0] + R(-1, 1), z: st[1] + R(-1, 1), v: R(1.05, 1.35), wait: R(0, 3), carry: null, ph: R(0, 6) };
     m.position.set(w.x, heightAt(w.x, w.z), w.z); dyn.walkers.push(w);
-    const label = { 'Hassan — beach': TEAM.HassanBeach, 'Kamal — windsurf': TEAM.Kamal, 'Ahmed — windsurf': TEAM.AhmedBeach, 'Manias (klient)': MANIAS, 'Braili (klient)': BRAILI };
+    const label = { 'Hassan — beach': TEAM.HassanBeach, 'Kamal — windsurf': TEAM.Kamal, 'Ahmed — windsurf': TEAM.AhmedBeach, 'Manias (klient)': MANIAS, 'Brailey (klient)': BRAILI, 'Magda (klientka)': MAGDA, 'Petra — managerka': TEAM.Petra };
+    if (p === TEAM.Petra) { TALK.petra = w; TALK.bP = bubble(m); }
+    if (p === MAGDA) TALK.bM = bubble(m, 'think');
     for (const [nm, tp] of Object.entries(label)) if (tp === p) dyn.npcs.push({ name: nm, obj: m });
   }
 }
@@ -1559,12 +1652,12 @@ function stepTarget(w) { const t = w.steps[w.si][0]; return typeof t === 'functi
 function updateWorkers(dt, t) {
   let rinsing = null;
   for (const w of dyn.walkers) {
-    if (!w.path) { const [tx, tz] = stepTarget(w); w.path = findPath(w.x, w.z, tx, tz); w.pi = 0; setAnim(w.m, 'walk'); }
+    if (!w.path) { const [tx, tz] = stepTarget(w); w.path = findPath(w.x, w.z, tx, tz); w.pi = 0; w.acting = null; setAnim(w.m, 'walk'); }
     if (w.pi < w.path.length) {
       const [tx, tz] = w.path[w.pi], dx = tx - w.x, dz = tz - w.z, d = Math.hypot(dx, dz), sp = w.v * (depthAt(w.x, w.z) > .15 ? .6 : 1);
       if (d < .25) w.pi++; else { const s = Math.min(d, sp * dt); w.x += dx / d * s; w.z += dz / d * s; const ta = Math.atan2(dx, dz); let da = ta - w.m.rotation.y; da = Math.atan2(Math.sin(da), Math.cos(da)); w.m.rotation.y += da * Math.min(1, dt * 8); }
       if (w.pi >= w.path.length) {                                   // dotarł — wykonaj akcję
-        const act = w.steps[w.si][1]; w.wait = w.steps[w.si][2]; setAnim(w.m, 'stand');
+        const act = w.steps[w.si][1]; w.wait = w.steps[w.si][2]; w.acting = act; setAnim(w.m, 'stand');
         if (act.startsWith('pick')) { if (w.carry) w.m.remove(w.carry); w.carry = act === 'pick-kite' ? carryKite() : carryBoard(act === 'pick-ws'); w.m.add(w.carry); }
         if (act === 'drop' && w.carry) { w.m.remove(w.carry); w.carry = null; }
       }
@@ -1652,8 +1745,8 @@ function step(dt, t) {
   const dAng = Math.atan2(wind.down.x, wind.down.z);
   for (const k of dyn.kiters) {
     const p = moveRider(k, dt, t, .35), ok = !!p; k.grp.visible = k.kiteM.visible = k.lines.visible = k.wake.mesh.visible = ok; if (!ok) { k.wake.reset(); continue; }
-    const [x, z] = p; k.ko += (k.dir * 10 - k.ko) * Math.min(1, dt * .7);
-    let jump = 0, kiteUp = 0;
+    let [x, z] = p; k.ko += (k.dir * 10 - k.ko) * Math.min(1, dt * .7);
+    let jump = 0, kiteUp = 0, loopA = 0;
     if (k.name === 'Krzysztof') {                    // backroll: wybicie, niedokręcony obrót z machaniem, gleba w wodę, chwila leżenia, waterstart
       k.trick = (k.trick ?? 5) - dt; const T = -k.trick;
       if (k.trick < 0 && T < 1.9) { const p = T / 1.9; jump = Math.sin(Math.PI * p) * 3.6; kiteUp = 4 * Math.sin(Math.PI * p); k.grp.rotation.x = -p * TAU * .78 + Math.sin(p * 23) * .22; k.grp.rotation.z = Math.sin(p * 9) * .35; }
@@ -1661,9 +1754,24 @@ function step(dt, t) {
         k.splash.position.set(x, lv + .04, z); const sp = Math.min(1, (T - 1.9) / .6); k.splash.scale.setScalar(.5 + sp * 2); k.splash.material.opacity = .8 * (1 - sp); }
       else { k.grp.rotation.x = 0; k.grp.rotation.z = 0; k.splash.material.opacity = 0; if (k.trick < 0) k.trick = R(7, 13); }
     }
+    if (k.name === 'Iwona' && TALK.jumpT >= 0) {         // próba skoku: mini podskok, chwianie, gleba
+      const T = TALK.jumpT;
+      if (T < .9) { const q = T / .9; jump = Math.sin(Math.PI * q) * .55; k.grp.rotation.z = Math.sin(q * 14) * .3; }
+      else if (T < 3.1) { jump = -.35; k.grp.rotation.x = -Math.PI * .5; k.grp.rotation.z = .5; kiteUp = -8; k.splash.position.set(x, lv + .04, z); const q = Math.min(1, (T - .9) / .6); k.splash.scale.setScalar(.4 + q * 1.4); k.splash.material.opacity = .7 * (1 - q); }
+      else { k.grp.rotation.x = 0; k.grp.rotation.z = 0; }
+    } else if (k.name === 'Iwona') { k.grp.rotation.x = 0; k.grp.rotation.z = 0; }
+    if (k.name === 'Jasiu') {                           // kiteloop: wybicie, w połowie pętli się rozmyśla — kite w strefie mocy niesie go ~30 m
+      k.trick = (k.trick ?? 6) - dt; const T = -k.trick;
+      if (k.trick < 0 && T < 1) { const q = T; jump = Math.sin(Math.PI * q * .5) * 4; loopA = q * Math.PI * .9; }
+      else if (k.trick < 0 && T < 3.3) { const q = (T - 1) / 2.3; loopA = Math.PI * .9; k.drag = 30 * smooth(0, 1, q); jump = 4 * Math.cos(Math.PI * .5 * q) + Math.sin(Math.PI * q) * 1.5; k.grp.rotation.x = -1.25 * Math.sin(Math.PI * Math.min(1, q * 1.2)); }
+      else if (k.trick < 0 && T < 5.6) { jump = -.35; k.grp.rotation.x = -Math.PI * .5; kiteUp = -9; loopA = Math.PI * .9; k.splash.position.set(x + wind.down.x * k.drag, lv + .04, z + wind.down.z * k.drag); const q = Math.min(1, (T - 3.3) / .6); k.splash.scale.setScalar(.6 + q * 2.2); k.splash.material.opacity = .85 * (1 - q); }
+      else { k.grp.rotation.x = 0; k.splash.material.opacity = 0; if (k.trick < 0) k.trick = R(9, 15); }
+      if (k.trick > 0) k.drag = Math.max(0, (k.drag || 0) - dt * 1.2);
+      x += wind.down.x * (k.drag || 0); z += wind.down.z * (k.drag || 0);
+    }
     k.grp.position.set(x, lv + .02 + jump, z); k.grp.rotation.y = dAng + k.dir * .35;
     k.board.rotation.y = Math.atan2(-wind.side.z * k.dir, wind.side.x * k.dir) - k.grp.rotation.y;
-    const tips = flyKite(k.kiteM, x, lv + 1.1 + jump, z, x + wind.down.x * 17 + wind.side.x * k.ko, Math.max(1.5, 13 - Math.abs(k.ko) * .25 + kiteUp), z + wind.down.z * 17 + wind.side.z * k.ko);
+    const lo = Math.sin(loopA) * 8 * k.dir, tips = flyKite(k.kiteM, x, lv + 1.1 + jump, z, x + wind.down.x * 17 + wind.side.x * (k.ko + lo), Math.max(1.5, 13 - Math.abs(k.ko) * .25 + kiteUp + (Math.cos(loopA) - 1) * 6), z + wind.down.z * 17 + wind.side.z * (k.ko + lo));
     setLines(k.lines, _a.set(x, lv + 1.1 + Math.max(0, jump), z), tips);
     k.tt += dt; if (k.tt > .1) { k.tt = 0; k.wake.push(x, z); } k.wake.update();
   }
@@ -1679,6 +1787,7 @@ function step(dt, t) {
     s.tt += dt; if (s.tt > .12) { s.tt = 0; s.wake.push(x, z); } s.wake.update();
   }
   updateParked(dt, t);
+  updateZone(dt, t);
   updateWorkers(dt, t);
   for (const f of FLOATERS) { f.m.position.y = Math.max(lv + (f.buoy ? .1 : 0) + Math.sin(t * 1.3 + f.ph) * .05, f.minY); if (!f.buoy) f.m.rotation.z = Math.sin(t * .9 + f.ph) * .03; }
   for (const f of FLAGS) {
@@ -1706,6 +1815,7 @@ for (const [x, y, z, t] of LABELS) { const d = document.createElement('div'); d.
 for (const [x, y, z, t] of ZONES) { const d = document.createElement('div'); d.className = 'lab zone'; d.textContent = t; labelsEl.appendChild(d); labelEls.push({ d, p: new V3(x, y, z) }); }
 function placeLabels() {
   const w = innerWidth, h = innerHeight, v = new V3();
+  for (const B of BUBBLES) { B.obj.getWorldPosition(v); v.y += 2.3; v.project(cam); const vis = showLabels && !!B.text && B.obj.visible !== false && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && cam.zoom > 1.2; B.d.style.display = vis ? 'block' : 'none'; if (vis) { if (B.d.textContent !== B.text) B.d.textContent = B.text; B.d.style.left = (v.x * .5 + .5) * w + 'px'; B.d.style.top = (-v.y * .5 + .5) * h - 22 + 'px'; } }
   for (const L of labelEls) { v.copy(L.p).project(cam); const vis = showLabels && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1; L.d.style.display = vis ? 'block' : 'none'; if (vis) { L.d.style.left = (v.x * .5 + .5) * w + 'px'; L.d.style.top = (-v.y * .5 + .5) * h + 'px'; } }
   for (const N of npcEls) { N.obj.getWorldPosition(v); v.y += 2; v.project(cam); const vis = showLabels && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && cam.zoom > 1.6; N.d.style.display = vis ? 'block' : 'none'; if (vis) { N.d.style.left = (v.x * .5 + .5) * w + 'px'; N.d.style.top = (-v.y * .5 + .5) * h + 'px'; } }
 }
@@ -1714,7 +1824,7 @@ function placeLabels() {
 // ZAKŁADKA EKIPA: zdjęcia z oficjalnej listy zespołu + skok kamery do osoby
 // =====================================================================
 const CREW = [
-  ['Peter — szef', 'peter', 'Peter', 'Szef stacji', 0x7d8a9a], ['Petra — managerka', '', 'Petra', 'Managerka (biuro) — brak zdjęcia', 0xffffff],
+  ['Peter — szef', 'peter', 'Peter', 'Szef stacji', 0x7d8a9a], ['Petra — managerka', '', 'Petra', 'Managerka — „You registered with the group?” 🚬', 0x7a3fb0],
   ['Ahmed — szef stacji', 'ahmed', 'Ahmed', 'Kierownik stacji, instruktor kite', SM_CYAN], ['Atamish', 'atamish', 'Atamish', 'Instruktor kite', SM_POLO],
   ['Moktar', 'moktar', 'Moktar', 'Instruktor kite', SM_CYAN], ['Abdallah', 'abdallah', 'Abdallah', 'Instruktor kite', SM_CYAN],
   ['Khaled', 'khaled', 'Khaled', 'Instruktor kite', SM_CYAN], ['Mahmoudi', 'mahmoudi', 'Mahmoudi', 'Biuro / instruktor kite', SM_CYAN],
@@ -1724,7 +1834,9 @@ const CREW = [
   ['Hassan — beach', 'hassan-beach', 'Hassan', 'Beach service (kite)', SM_CYAN], ['Amr — Baywatch', 'amr', 'Amr', 'Baywatch — wieża', SM_CYAN],
   ['Abo Abdo — wypożyczalnia', 'abo-abdo', 'Abo Abdo', 'Wypożyczalnia', SM_CYAN], ['Fotograf', '', 'Fotograf', 'Zdjęcia na plaży — brak zdjęcia', 0xf5d21e],
   ['Fotograf', '', 'Fotograf', 'Zdjęcia na plaży — brak zdjęcia', 0xf5d21e], ['Felix — kot stacji', 'felix', 'Felix', 'Kot stacji', 0xf4f4f2],
-  ['Manias (klient)', '', 'Manias', 'Klient — zawsze kręci się przy fotografie', 0x2d4f7a], ['Braili (klient)', '', 'Braili', 'Klient — tylko żółte spodenki', 0xf2c81e], ['Krzysztof (klient)', '', 'Krzysztof', 'Klient — bardzo nieładne backrolle', 0x1e1e22],
+  ['Manias (klient)', '', 'Manias', 'Klient — zawsze kręci się przy fotografie', 0x2d4f7a], ['Brailey (klient)', '', 'Brailey', 'Klient — tylko żółte spodenki', 0xf2c81e], ['Krzysztof (klient)', '', 'Krzysztof', 'Klient — bardzo nieładne backrolle', 0x1e1e22],
+  ['Dida (instruktorka)', '', 'Dida', 'Uczy Iwonę skoku i się wkurza', 0x1e1e22], ['Iwona (klientka)', '', 'Iwona', 'Kask zjeżdża z głowy, próbuje skoczyć', 0xf2c81e],
+  ['Jasiu (klient)', '', 'Jasiu', 'Loopy — w połowie się rozmyśla', 0x2a2e36], ['Magda (klientka)', '', 'Magda', 'Myśli tylko o Sycylii', 0xf2f2f2],
 ];
 const teamEl = document.getElementById('team'), cardsEl = document.getElementById('cards');
 const ring = new THREE.Mesh(new THREE.RingGeometry(.55, .8, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x22b8e6, transparent: true, depthWrite: false }));
@@ -1760,7 +1872,7 @@ function updateFocus(dt, t) {
 // =====================================================================
 let showRoofs = true, showLabels = true, anim = true, autoTide = true, t = 0, tidePhase = .6;
 const clock = new THREE.Clock();
-const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: MOBILE ? 0 : 4 }));
 composer.setSize(innerWidth, innerHeight);
 composer.addPass(new RenderPass(scene, cam));
 const gtao = new GTAOPass(scene, cam, innerWidth, innerHeight);
@@ -1770,8 +1882,7 @@ gtao.updatePdMaterial({ radius: 6, samples: 16 });
 gtao.blendIntensity = .9;
 const ovVis = gtao.overrideVisibility.bind(gtao);
 gtao.overrideVisibility = () => { ovVis(); for (const o of AO_HIDE) o.visible = false; };
-composer.addPass(gtao);
-composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .32, .45, 1.25));
+if (!MOBILE) { composer.addPass(gtao); composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .32, .45, 1.25)); }
 composer.addPass(new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uWarm },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
@@ -1823,8 +1934,8 @@ function frame() {
   tideTxt.textContent = `${lv >= 0 ? '+' : ''}${(lv * 100).toFixed(0)} cm (${txt})`;
   step(anim ? dt : 0, t);
   if (anim) for (const mx of MIXERS) mx.update(dt);
-  for (const a of ACCS) { a.head.getWorldPosition(a.am.position); a.am.rotation.y = a.grp.rotation.y; a.am.visible = a.grp.visible && (!a.grp.parent || a.grp.parent.visible !== false); }
-  updateFocus(dt, t); WIND_SCREEN.update(t);
+  for (const a of ACCS) { a.head.getWorldPosition(a.am.position); a.am.rotation.y = a.grp.rotation.y; if (a.loose) { a.am.rotation.z = .5 + Math.sin(t * 2.6) * .22; a.am.position.x += .06; a.am.position.y -= .03; }   /* kask Iwony zjeżdża z głowy */ a.am.visible = a.grp.visible && (!a.grp.parent || a.grp.parent.visible !== false); }
+  updateFocus(dt, t); WIND_SCREEN.update(t); if (anim) updateTalk(dt, t);
   controls.update(); viewUni.value.copy(cam.position).sub(controls.target).normalize(); updateSun();
   roofLayer.visible = showRoofs;
   composer.render(); placeLabels(); drawCompass();
@@ -1833,6 +1944,8 @@ function frame() {
 
 // ---------- UI ----------
 const bTeam = document.getElementById('bTeam');
+document.getElementById('uiToggle').onclick = () => document.getElementById('ui').classList.toggle('hide');
+if (MOBILE && innerWidth < 760) document.getElementById('ui').classList.add('hide');
 bTeam.onclick = () => { teamEl.classList.toggle('on'); bTeam.classList.toggle('on', teamEl.classList.contains('on')); };
 const bRoof = document.getElementById('bRoof'), bLab = document.getElementById('bLab'), bView = document.getElementById('bView'), bAnim = document.getElementById('bAnim'), bTide = document.getElementById('bTide');
 const sync = () => { bRoof.classList.toggle('on', showRoofs); bLab.classList.toggle('on', showLabels); bAnim.classList.toggle('on', anim); bTide.classList.toggle('on', autoTide); bView.textContent = tilted ? 'Widok z góry (T)' : 'Skos jak Tropico (T)'; };

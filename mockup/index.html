@@ -1621,7 +1621,8 @@ function bubble(obj, cls = '') { const d = document.createElement('div'); d.clas
 function updateTalk(dt, t) {
   if (!TALK.dida) return;
   TALK.t += dt; const [who, text, dur, anim] = SCRIPT[TALK.i];
-  TALK.bD.text = who === 'dida' ? text : ''; TALK.bI.text = who === 'iwona' ? text : ''; TALK.bD.d.classList.toggle('angry', anim === 'angry');
+  const jn = (t % 11) < 1.6 && who !== 'dida' ? ['Joo', 'nooo!'][Math.floor(t / 11) % 2] : '';   // Dida co jakiś czas: „Joo” / „nooo!”
+  TALK.bD.text = who === 'dida' ? text : jn; TALK.bI.text = who === 'iwona' ? text : ''; TALK.bD.d.classList.toggle('angry', anim === 'angry');
   if (who === 'dida' && TALK.didaAnim !== anim) { TALK.didaAnim = anim; setAnim(TALK.dida, anim); }
   if (TALK.jumpT >= 0) TALK.jumpT += dt;
   if (TALK.t >= dur) { TALK.t = 0; TALK.i = (TALK.i + 1) % SCRIPT.length; if (SCRIPT[TALK.i][0] === 'jump') TALK.jumpT = 0; }

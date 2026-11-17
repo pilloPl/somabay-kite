@@ -1697,7 +1697,7 @@ function updateWorkers(dt, t) {
     for (let i = 0; i < SPRAY.n; i++) { const f = (SPRAY.ph[i] + t * 1.4) % 1; P.setXYZ(i, sx + dx * f * .8 + (Math.random() - .5) * .05, LAND + 1.1 + f * .5 - f * f * 1.3, sz + dz * f * .8 + (Math.random() - .5) * .05); } P.needsUpdate = true; }
 }
 // krawędź okna wiatru: theta 0 = przy ziemi 90° do wiatru (z boku), PI/2 = zenit
-function windowPos(ox, oy, oz, theta, Lr) { return new V3(ox + wind.side.x * Math.cos(theta) * Lr + wind.down.x * Lr * .12 * Math.sin(theta), oy + .4 + Math.sin(theta) * Lr * .92, oz + wind.side.z * Math.cos(theta) * Lr + wind.down.z * Lr * .12 * Math.sin(theta)); }
+function windowPos(ox, oy, oz, theta, Lr, sgn = 1) { return new V3(ox + wind.side.x * sgn * Math.cos(theta) * Lr + wind.down.x * Lr * .12 * Math.sin(theta), oy + .4 + Math.sin(theta) * Lr * .92, oz + wind.side.z * sgn * Math.cos(theta) * Lr + wind.down.z * Lr * .12 * Math.sin(theta)); }
 function walkTo(o, tx, tz, sp, dt) { const dx = tx - o.x, dz = tz - o.z, d = Math.hypot(dx, dz); if (d < .35) { setAnim(o.m, 'stand'); return true; } const st = Math.min(d, sp * dt); o.x += dx / d * st; o.z += dz / d * st; o.m.rotation.y = Math.atan2(dx, dz); setAnim(o.m, 'walk'); return false; }
 const SESS = [], BBOYS = [];
 function spawnSessions() {
@@ -1718,21 +1718,24 @@ function updateSessions(dt, t) {
   const lv = uLevel.value, place = o => o.m.position.set(o.x, Math.max(heightAt(o.x, o.z), lv - .45), o.z);
   for (const b of BBOYS) { b.bub.text = b.say || ''; b.say = ''; }
   for (const sk of SESS) {
-    const S0 = [shoreX(sk.zs) - 1.6, sk.zs], H = [S0[0] + wind.side.x * sk.Lr * .95, S0[1] + wind.side.z * sk.Lr * .95], W = [shoreX(sk.zs) + 7, sk.zs], waterOK = depthAt(shoreX(sk.zs) + 30, sk.zs) > .42;
+    const E = [shoreX(sk.zs + 7) + 1.5, sk.zs + 7], R0 = [shoreX(sk.zs + 4) + 19, sk.zs + 4], H = [R0[0] - wind.side.x * sk.Lr * .95, R0[1] - wind.side.z * sk.Lr * .95], W = [shoreX(sk.zs) + 26, sk.zs - 6], waterOK = depthAt(shoreX(sk.zs) + 30, sk.zs) > .42;
     const bb = sk.bb; sk.t -= dt;
     const kiteAt = (v, hard) => { if (hard) sk.kp.copy(v); else sk.kp.lerp(v, Math.min(1, dt * 1.6)); const tips = flyKite(sk.kiteM, sk.x, sk.m.position.y + 1.1, sk.z, sk.kp.x, sk.kp.y, sk.kp.z); setLines(sk.lines, _a.set(sk.x, sk.m.position.y + 1.1, sk.z), tips); };
-    const zenith = () => windowPos(sk.x, sk.m.position.y, sk.z, Math.PI / 2, sk.Lr);
+    const zenith = () => windowPos(sk.x, sk.m.position.y, sk.z, Math.PI / 2, sk.Lr, -1);
     switch (sk.state) {
       case 'parked': sk.parkM.visible = true; sk.kiteM.visible = sk.lines.visible = false; place(sk);
         if (sk.t <= 0) { const f = BBOYS.find(b => !b.busy); if (waterOK && wind.kn >= 11 && f) { f.busy = sk; sk.bb = f; sk.state = 'prep'; sk.picked = false; } else sk.t = 6; } break;
       case 'prep': {                                    // beachboy bierze kite z trawy i niesie go na krawędź okna; kiter idzie na plażę
         if (!sk.picked) { if (walkTo(bb, sk.P[0], sk.P[1], 1.6, dt)) { sk.picked = true; sk.parkM.visible = false; bb.carry = carryKite(sk.k); bb.m.add(bb.carry); } }
-        else { const a1 = walkTo(bb, H[0], H[1], 1.5, dt), a2 = walkTo(sk, S0[0], S0[1], 1.3, dt); if (a1) bb.say = 'GO LEFT! GO LEFT! 👈'; if (a1 && a2) { bb.m.remove(bb.carry); bb.carry = null; sk.state = 'launch'; sk.t = 5.5; sk.kiteM.visible = sk.lines.visible = true; kiteAt(windowPos(sk.x, sk.m.position.y, sk.z, .06, sk.Lr), true); } }
+        else { const a1 = walkTo(bb, H[0], H[1], 1.5, dt); let a2 = false; if (!sk.inWater) { if (walkTo(sk, E[0], E[1], 1.3, dt)) sk.inWater = true; } else a2 = walkTo(sk, R0[0], R0[1], .9, dt);
+          if (a1 && a2) { bb.m.remove(bb.carry); bb.carry = null; sk.state = 'launch'; sk.t = 5.5; sk.inWater = false; sk.kiteM.visible = sk.lines.visible = true; kiteAt(windowPos(sk.x, sk.m.position.y, sk.z, .06, sk.Lr, -1), true); } }
         place(sk); place(bb); break; }
       case 'launch': {                                  // kite wznosi się po krawędzi okna do zenitu
-        const q = smooth(0, 1, 1 - sk.t / 5.5); kiteAt(windowPos(sk.x, sk.m.position.y, sk.z, .06 + (Math.PI / 2 - .06) * q, sk.Lr), true); bb.say = 'GO LEFT! GO LEFT! 👈'; bb.m.rotation.y = Math.atan2(sk.x - bb.x, sk.z - bb.z);
-        if (sk.t <= 0) { sk.state = 'walkin'; bb.busy = null; sk.bb = null; } place(sk); place(bb); break; }
-      case 'walkin': kiteAt(zenith()); if (walkTo(sk, W[0], W[1], 1.1, dt)) { sk.state = 'ride'; sk.cx = shoreX(sk.zs) + 36; sk.cz = sk.zs; sk.u = -sk.L * .9; sk.dir = 1; sk.t = R(60, 120); sk.board.visible = true; sk.wake.reset(); sk.m.children[0].rotation.x = -.32; } place(sk); break;
+        const q = smooth(0, 1, 1 - sk.t / 5.5); if (q > .35) { walkTo(sk, sk.x + wind.from.x * 3, sk.z + wind.from.z * 3, .7, dt); }
+        kiteAt(windowPos(sk.x, sk.m.position.y, sk.z, .06 + (Math.PI / 2 - .06) * q, sk.Lr, -1), true); bb.say = 'GO LEFT! GO LEFT! 👈'; bb.m.rotation.y = Math.atan2(sk.x - bb.x, sk.z - bb.z);
+        if (sk.t <= 0) { sk.state = 'walkin'; sk.shout = 3; bb.busy = null; sk.bb = null; } place(sk); place(bb); break; }
+      case 'walkin': kiteAt(zenith()); if ((sk.shout -= dt) > 0) { const b0 = BBOYS.reduce((a, b) => Math.hypot(b.x - sk.x, b.z - sk.z) < Math.hypot(a.x - sk.x, a.z - sk.z) ? b : a); b0.say = 'GO LEFT! GO LEFT! 👈'; }
+        if (walkTo(sk, W[0], W[1], 1.0, dt)) { sk.state = 'ride'; sk.cx = shoreX(sk.zs) + 36; sk.cz = sk.zs; sk.u = -sk.L * .9; sk.dir = 1; sk.t = R(60, 120); sk.board.visible = true; sk.wake.reset(); sk.m.children[0].rotation.x = -.32; } place(sk); break;
       case 'ride': {
         const pr = moveRider(sk, dt, t, .35);
         if (!pr || sk.t <= 0 || wind.kn < 9) { sk.state = 'return'; sk.board.visible = false; sk.m.children[0].rotation.x = 0; sk.wake.reset(); break; }
@@ -1741,10 +1744,10 @@ function updateSessions(dt, t) {
         sk.board.position.set(sk.x, lv + .02, sk.z); sk.board.rotation.y = Math.atan2(-wind.side.z * sk.dir, wind.side.x * sk.dir);
         kiteAt(new V3(sk.x + wind.down.x * 17 + wind.side.x * sk.ko, 13 - Math.abs(sk.ko) * .25, sk.z + wind.down.z * 17 + wind.side.z * sk.ko));
         sk.tt += dt; if (sk.tt > .1) { sk.tt = 0; sk.wake.push(sk.x, sk.z); } sk.wake.update(); break; }
-      case 'return': kiteAt(zenith()); if (walkTo(sk, S0[0], S0[1], 1.2, dt)) { const f = BBOYS.find(b => !b.busy); if (f) { f.busy = sk; sk.bb = f; sk.state = 'landwait'; } } place(sk); break;
+      case 'return': kiteAt(zenith()); if (walkTo(sk, R0[0], R0[1], 1.0, dt)) { const f = BBOYS.find(b => !b.busy); if (f) { f.busy = sk; sk.bb = f; sk.state = 'landwait'; } } place(sk); break;
       case 'landwait': kiteAt(zenith()); if (walkTo(bb, H[0], H[1], 1.7, dt)) { sk.state = 'land'; sk.t = 4.5; } place(sk); place(bb); break;
       case 'land': {                                    // sprowadzenie po krawędzi okna nisko z boku; beachboy łapie za krawędź natarcia
-        const q = smooth(0, 1, 1 - sk.t / 4.5); kiteAt(windowPos(sk.x, sk.m.position.y, sk.z, Math.PI / 2 - (Math.PI / 2 - .06) * q, sk.Lr), true); bb.m.rotation.y = Math.atan2(sk.x - bb.x, sk.z - bb.z);
+        const q = smooth(0, 1, 1 - sk.t / 4.5); kiteAt(windowPos(sk.x, sk.m.position.y, sk.z, Math.PI / 2 - (Math.PI / 2 - .06) * q, sk.Lr, -1), true); bb.m.rotation.y = Math.atan2(sk.x - bb.x, sk.z - bb.z);
         if (sk.t <= 0) { sk.kiteM.visible = sk.lines.visible = false; bb.carry = carryKite(sk.k); bb.m.add(bb.carry); sk.state = 'park'; } place(sk); place(bb); break; }
       case 'park': { const a1 = walkTo(bb, sk.P[0] + .8, sk.P[1], 1.5, dt), a2 = walkTo(sk, sk.P[0] - 1.2, sk.P[1] - 1.5, 1.2, dt);   // odnosi kite na trawę i odkłada krawędzią do wiatru
         if (a1 && bb.carry) { bb.m.remove(bb.carry); bb.carry = null; sk.parkM.visible = true; sk.parkM.rotation.y = -wind.deg * Math.PI / 180; bb.busy = null; sk.bb = null; }

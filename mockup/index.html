@@ -1598,7 +1598,7 @@ const JASIU = { skin: 0xe6b894, shirt: 0x2a2e36, hair: 0xc8aa6e, shorts: 0x1e1e2
 const MAGDA = { female: true, skin: 0xecc9ab, shirt: 0xf2f2f2, hair: 0x5a3c23, shorts: 0x2d4f7a, longHair: true, shadesOnHead: true };
 // scenka: Dida uczy Iwonę skoku i się wkurza; Magda myśli tylko o Sycylii
 const TALK = { t: 0, i: 0, jumpT: -1 };
-const JW = { wc: false, t: 35, k: null, mark: null, wcBody: null, b: null };   // Jasiu: woda ↔ kibel
+const JW = { wc: true, t: 25, k: null, mark: null, wcBody: null, b: null };   // Jasiu: woda ↔ kibel
 const SCRIPT = [['dida', 'Iwona! Krawędź, napnij linki, bar do siebie i HOP!', 3.6, 'stand'], ['jump', '', 2.8], ['dida', 'No kurde, Iwona!!! Ile razy mam mówić — KRAWĘDŹ!', 3.2, 'angry'],
   ['iwona', 'Skoczyłbyś!', 2.6], ['dida', 'Grrr… Dobra. Jeszcze raz. Od początku.', 3, 'stand'], ['pause', '', 2.5]];
 const SICILY = ['Sycylia… 🍋', 'Tani lot do Katanii w październiku?', 'San Vito Lo Capo — tam też wieje…', 'Cannoli, arancini, Etna… i wiatr', 'A może Marsala? Laguna jak tu…', 'Ile kosztuje kite bag w Ryanairze…', 'Palermo → Trapani autem, 1,5 h…'];
@@ -1622,8 +1622,8 @@ function updateTalk(dt, t) {
     P.needsUpdate = true;
   }
   if (JW.k) {
-    JW.t -= dt; if (JW.t <= 0) { JW.wc = !JW.wc; JW.t = JW.wc ? R(20, 35) : R(40, 70); JW.k.trick = R(4, 8); JW.k.drag = 0; JW.k.wake.reset(); }
-    JW.wcBody.visible = JW.wc; JW.b.text = JW.wc && (t % 9) < 4 ? pick0(['🚽 …', 'Zaraz wracam na loopy…', 'Kto zabrał papier?!'], Math.floor(t / 9)) : '';
+    JW.t -= dt; if (JW.t <= 0) { JW.wc = !JW.wc; JW.t = JW.wc ? R(20, 35) : R(30, 50); JW.k.trick = R(4, 8); JW.k.drag = 0; JW.k.wake.reset(); }
+    JW.wcBody.visible = JW.wc; JW.b.text = JW.wc && (t % 8) < 5 ? pick0(['🚽 …', 'Zaraz wracam na loopy…', 'Kto zabrał papier?!', 'Jeszcze chwila…', 'Czemu tu nie ma zasięgu?'], Math.floor(t / 8)) : '';
     (JW.wc ? JW.wcBody : JW.k.body).getWorldPosition(JW.mark.position);
   }
   if (TALK.bM) TALK.bM.text = (t % 5.5) < 4.3 ? SICILY[Math.floor(t / 5.5) % SICILY.length] : '';

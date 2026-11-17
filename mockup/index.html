@@ -771,8 +771,8 @@ function personGeom(p, pose = 'stand') {
   return mergeGeometries(parts, false);
 }
 const MIXERS = [], ACCS = [];
-const CLIPS = { man: { stand: 'HumanArmature|Man_Idle', walk: 'HumanArmature|Man_Walk', sit: 'HumanArmature|Man_Sitting', ride: 'HumanArmature|Man_Standing', angry: 'HumanArmature|Man_Punch' },
-  woman: { stand: 'Armature|Idle', walk: 'Armature|Walking', sit: 'Armature|SitIdle', ride: 'Armature|Idle', angry: 'Armature|Punch' } };
+const CLIPS = { man: { stand: 'HumanArmature|Man_Idle', walk: 'HumanArmature|Man_Walk', run: 'HumanArmature|Man_Run', sit: 'HumanArmature|Man_Sitting', ride: 'HumanArmature|Man_Standing', angry: 'HumanArmature|Man_Punch' },
+  woman: { stand: 'Armature|Idle', walk: 'Armature|Walking', run: 'Armature|Running', sit: 'Armature|SitIdle', ride: 'Armature|Idle', angry: 'Armature|Punch' } };
 // dodatki przypięte do głowy: czapka, okulary, broda, aparat
 function accessoryGeom(p) {
   const parts = [], add = (g, hex, x, y, z, sx = 1, sy = 1, sz = 1) => { xf(g, x, y, z, 0, 0, 0, sx, sy, sz); paint(g, hex); parts.push(g.index ? g.toNonIndexed() : g); };
@@ -1467,11 +1467,12 @@ function trainHorn() {
     for (const f of [277.2, 349.2, 415.3]) { const o = AC.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f * .97, t0); o.frequency.linearRampToValueAtTime(f, t0 + .18); o.connect(g); o.start(t0); o.stop(t0 + len + .05); }
   }
 }
+const CLOSE_SHOUTS = ['KONIEC! Do brzegu! 🛟', 'Closing time! Go to the beach!', 'Yalla, yalla — finish!', 'Stacja zamknięta! Wychodzimy!'];
 const SHOUTS = ['Hej! To strefa WIND!', 'Wypływaj! Kite jest tam! ⬆', 'Yalla, yalla — go north!', 'Mister! Out of windsurf zone!', 'Haloooo! Linki! Uważaj!'];
 function updateZone(dt, t) {
   const kiters = dyn.kiters.filter(k => k.grp.visible && !k.name);
   ZONE.next -= dt;
-  if (!ZONE.k && ZONE.next <= 0 && kiters.length) { const k = pick(kiters); ZONE.k = k; k.czHome = k.cz; k.czT = ZONE.line + R(8, 16); k.stay = R(4, 16); ZONE.inT = 0; ZONE.honked = false; ZONE.next = 30; }
+  if (!ZONE.k && ZONE.next <= 0 && kiters.length && !isClosing()) { const k = pick(kiters); ZONE.k = k; k.czHome = k.cz; k.czT = ZONE.line + R(8, 16); k.stay = R(4, 16); ZONE.inT = 0; ZONE.honked = false; ZONE.next = 30; }
   for (const k of dyn.kiters) if (k.czT !== undefined) { k.cz += (k.czT - k.cz) * Math.min(1, dt * .35); }
   const k = ZONE.k;
   if (k) {
@@ -1484,17 +1485,32 @@ function updateZone(dt, t) {
   ZONE.amrT -= dt; if (ZONE.amr) ZONE.amr.text = ZONE.amrT > 0 ? 'TUUUUT! TUUUUUUT! 🚂' : '';
   // ponton: płynie do intruza, krąży wokół i krzyczy; potem wraca
   const P = PATROL; if (!P.m) return;
+  if (isClosing() && !ZONE.k) {                                                   // zamykanie: ponton zgania maruderów z wody
+    if (!P.tg || !P.tg.grp.visible) { const left = [...dyn.kiters, ...dyn.surfers, ...dyn.wingers].filter(r => r.grp.visible && r.leaving); P.tg = left.length ? pick(left) : null; }
+    if (P.tg && P.state === 'home') P.state = 'go'; if (!P.tg && P.state !== 'home') P.state = 'back';
+  } else if (P.tg) { P.tg = null; if (!ZONE.k && P.state !== 'home') P.state = 'back'; }
   if (P.state === 'home') { P.x = P.home[0]; P.z = P.home[1]; P.ry = P.home[2]; }
   else {
     let tx, tz;
-    if (P.state === 'back' || !ZONE.k) { [tx, tz] = P.home; P.state = 'back'; }
-    else { P.a += dt * .55; const kp = ZONE.k.grp.position; tx = kp.x + Math.cos(P.a) * 11; tz = kp.z + Math.sin(P.a) * 11; if (P.state === 'go' && Math.hypot(tx - P.x, tz - P.z) < 4) P.state = 'circle'; }
+    if (P.state === 'back' || !(ZONE.k || P.tg)) { [tx, tz] = P.home; P.state = 'back'; }
+    else { P.a += dt * .55; const kp = (ZONE.k || P.tg).grp.position; tx = kp.x + Math.cos(P.a) * 11; tz = kp.z + Math.sin(P.a) * 11; if (P.state === 'go' && Math.hypot(tx - P.x, tz - P.z) < 4) P.state = 'circle'; }
     const dx = tx - P.x, dz = tz - P.z, d = Math.hypot(dx, dz), sp = Math.min(d, (P.state === 'circle' ? 9 : 11) * dt);
     if (d > .05) { P.x += dx / d * sp; P.z += dz / d * sp; const want = Math.atan2(-dz, dx); let da = want - P.ry; da = Math.atan2(Math.sin(da), Math.cos(da)); P.ry += da * Math.min(1, dt * 3); }
     if (P.state === 'back' && d < .5) P.state = 'home';
   }
   P.m.position.set(P.x, Math.max(uLevel.value, heightAt(P.x, P.z)) + Math.sin(t * 1.4) * .05, P.z); P.m.rotation.y = P.ry; P.m.rotation.z = P.state === 'home' ? 0 : Math.sin(t * 2) * .05;
-  if (ZONE.boat) ZONE.boat.text = (P.state === 'circle' || P.state === 'go') ? SHOUTS[Math.floor(t / 2.6) % SHOUTS.length] : '';
+  const SH = ZONE.k ? SHOUTS : CLOSE_SHOUTS; if (ZONE.boat) ZONE.boat.text = (P.state === 'circle' || P.state === 'go') ? SH[Math.floor(t / 2.6) % SH.length] : '';
+}
+// zamknięcie stacji o 18:00 — od 17:00 ludzie schodzą z wody (każdy w swoim momencie), przed 9:00 też pusto
+const CLOSE_A = 1020, CLOSE_B = 1080, OPEN = 540, isClosing = () => tod.min >= CLOSE_A && tod.min < CLOSE_B;
+const LATE = ['Jeszcze jest czas…', 'Jeszcze jest czas!', 'Jeszcze jeden hals…', 'Jeszcze 5 minut…'];
+function closingRider(r, dt, t) {
+  if (r.outM === undefined) { r.outM = R(4, 54); r.cx0 = r.cx; r.lateTalk = rnd() < .55; }
+  const out = tod.min >= CLOSE_A + r.outM || tod.min < OPEN, tx = shoreX(r.cz) + 3;
+  if (out) { r.leaving = true; r.cx += (tx - r.cx) * Math.min(1, dt * .22); if (r.cx - tx < 2.5) r.gone = true; }
+  else { r.cx = r.cx0; r.leaving = r.gone = false; }
+  if (r.lateTalk) { if (!r.bub) r.bub = bubble(r.grp); r.bub.text = r.leaving && !r.gone && ((t + r.outM) % 6) < 2.6 ? LATE[Math.floor(r.outM) % LATE.length] : ''; }
+  return r.gone;
 }
 function moveRider(r, dt, t, minD) {
   const nu = r.u + r.dir * r.v * (r.vf ?? 1) * (.6 + .4 * wind.kn / 18) * dt, np = riderPos(r, t, nu);
@@ -1710,7 +1726,7 @@ function spawnSessions() {
     sk.P = [shoreX(zs) - 7.5, zs + 1.5]; sk.parkM.position.set(sk.P[0], heightAt(...sk.P), sk.P[1]); sk.parkM.rotation.y = -wind.deg * Math.PI / 180;
     sk.x = sk.P[0] - 1.2; sk.z = sk.P[1] - 1.5; SESS.push(sk);
   }
-  for (const [i, z] of [[0, 71], [1, 87]]) {
+  for (const [i, z] of [[0, 71], [1, 87], [0, 63], [1, 95]]) {
     const m = personMesh({ skin: 0x7d5238, shirt: SM_CYAN, hair: 0x141414, shorts: 0x22324a, cap: i ? 0xffffff : null }, 'stand'), b = { m, x: shoreX(z) - 2.5, z, home: [shoreX(z) - 2.5, z], busy: null, carry: null };
     b.bub = bubble(m); m.position.set(b.x, heightAt(b.x, b.z), b.z); BBOYS.push(b); dyn.npcs.push({ name: 'Beachboy (start)', obj: m });
   }
@@ -1725,7 +1741,7 @@ function updateSessions(dt, t) {
     const zenith = () => windowPos(sk.x, sk.m.position.y, sk.z, Math.PI / 2, sk.Lr, -1);
     switch (sk.state) {
       case 'parked': sk.parkM.visible = true; sk.kiteM.visible = sk.lines.visible = false; place(sk);
-        if (sk.t <= 0) { const f = BBOYS.find(b => !b.busy); if (waterOK && wind.kn >= 11 && f) { f.busy = sk; sk.bb = f; sk.state = 'prep'; sk.picked = false; } else sk.t = 6; } break;
+        if (sk.t <= 0) { const f = BBOYS.find(b => !b.busy); if (waterOK && wind.kn >= 11 && tod.min >= OPEN && tod.min < CLOSE_A && f) { f.busy = sk; sk.bb = f; sk.state = 'prep'; sk.picked = false; } else sk.t = 6; } break;
       case 'prep': {                                    // beachboy bierze kite z trawy i niesie go na krawędź okna; kiter idzie na plażę
         if (!sk.picked) { if (walkTo(bb, sk.P[0], sk.P[1], 1.6, dt)) { sk.picked = true; sk.parkM.visible = false; bb.carry = carryKite(sk.k); bb.m.add(bb.carry); } }
         else { const a1 = walkTo(bb, H[0], H[1], 1.5, dt); let a2 = false; if (!sk.inWater) { if (walkTo(sk, E[0], E[1], 1.3, dt)) sk.inWater = true; } else a2 = walkTo(sk, R0[0], R0[1], .9, dt);
@@ -1739,7 +1755,7 @@ function updateSessions(dt, t) {
         if (walkTo(sk, W[0], W[1], 1.0, dt)) { sk.state = 'ride'; sk.cx = shoreX(sk.zs) + 36; sk.cz = sk.zs; sk.u = -sk.L * .9; sk.dir = 1; sk.t = R(60, 120); sk.board.visible = true; sk.wake.reset(); sk.m.children[0].rotation.x = -.32; } place(sk); break;
       case 'ride': {
         const pr = moveRider(sk, dt, t, .35);
-        if (!pr || sk.t <= 0 || wind.kn < 9) { sk.state = 'return'; sk.board.visible = false; sk.m.children[0].rotation.x = 0; sk.wake.reset(); break; }
+        if (!pr || sk.t <= 0 || wind.kn < 9 || tod.min >= CLOSE_A + 8 || tod.min < OPEN) { sk.state = 'return'; sk.board.visible = false; sk.m.children[0].rotation.x = 0; sk.wake.reset(); break; }
         sk.x = pr[0]; sk.z = pr[1]; sk.ko += (sk.dir * 10 - sk.ko) * Math.min(1, dt * .7);
         sk.m.position.set(sk.x, lv + .02, sk.z); sk.m.rotation.y = Math.atan2(wind.down.x, wind.down.z) + sk.dir * .35;
         sk.board.position.set(sk.x, lv + .02, sk.z); sk.board.rotation.y = Math.atan2(-wind.side.z * sk.dir, wind.side.x * sk.dir);
@@ -1755,7 +1771,14 @@ function updateSessions(dt, t) {
         if (a1 && a2) { sk.state = 'parked'; sk.t = R(20, 45); } place(sk); if (sk.bb || !bb.busy) place(bb); break; }
     }
   }
-  for (const b of BBOYS) if (!b.busy) { walkTo(b, b.home[0], b.home[1], 1.3, dt); place(b); }
+  const CL = isClosing();
+  for (const b of BBOYS) if (!b.busy) {
+    if (CL) {                                                                 // biegają wzdłuż trawy i plaży, każą chować sprzęt
+      if (!b.run || Math.hypot(b.run[0] - b.x, b.run[1] - b.z) < .6) b.run = [shoreX(b.home[1]) - R(2, 12), R(58, 100)];
+      const dx = b.run[0] - b.x, dz = b.run[1] - b.z, d = Math.hypot(dx, dz), st = Math.min(d, 3.4 * dt); b.x += dx / d * st; b.z += dz / d * st; b.m.rotation.y = Math.atan2(dx, dz); setAnim(b.m, 'run'); b.say = ['KONIEC! Chowamy sprzęt! 🙌', 'Closing! Pack your kite!', 'Yalla, finish, finish!', 'Kity do magazynu!'][(Math.floor(t / 3) + BBOYS.indexOf(b)) % 4];
+    } else { b.run = null; walkTo(b, b.home[0], b.home[1], 1.3, dt); }
+    place(b);
+  }
 }
 function setLines(L, a, tips) { const P = L.geometry.attributes.position.array; P.set([a.x, a.y, a.z, tips[0].x, tips[0].y, tips[0].z, a.x, a.y, a.z, tips[1].x, tips[1].y, tips[1].z]); L.geometry.attributes.position.needsUpdate = true; }
 const _a = new V3(), _t0 = new V3(), _t1 = new V3();
@@ -1769,6 +1792,7 @@ function resetParked() {
 function updateParked(dt, t) {
   const P = (wind.kn / 18) ** 2, ws = wind.kn * .514;
   for (const k of PARKED) {
+    if (!k.loose) { const packed = tod.min >= 1050 + k.ph * 4 || tod.min < OPEN; if (k.root.visible === packed) { k.root.visible = !packed; if (k.extra) k.extra.visible = !packed; } }
     if (!k.loose) {
       const fx = -Math.sin(k.ry), fz = -Math.cos(k.ry), A = Math.acos(Math.max(-1, Math.min(1, fx * wind.from.x + fz * wind.from.z)));
       const sideF = Math.cos(k.ry) * wind.from.x - Math.sin(k.ry) * wind.from.z;
@@ -1828,7 +1852,7 @@ function step(dt, t) {
   const lv = uLevel.value, levelChanged = lastLevel === null || Math.abs(lv - lastLevel) > .01; if (levelChanged) lastLevel = lv;
   const dAng = Math.atan2(wind.down.x, wind.down.z);
   for (const k of dyn.kiters) {
-    const p = k === JW.k && JW.wc ? null : moveRider(k, dt, t, .35), ok = !!p; k.grp.visible = k.kiteM.visible = k.lines.visible = k.wake.mesh.visible = ok; if (k.splash && !ok) k.splash.material.opacity = 0; if (!ok) { k.wake.reset(); continue; }
+    const gone = closingRider(k, dt, t), p = (k === JW.k && JW.wc) || gone ? null : moveRider(k, dt, t, .35), ok = !!p; k.grp.visible = k.kiteM.visible = k.lines.visible = k.wake.mesh.visible = ok; if (k.splash && !ok) k.splash.material.opacity = 0; if (!ok) { k.wake.reset(); continue; }
     let [x, z] = p; k.ko += (k.dir * 10 - k.ko) * Math.min(1, dt * .7);
     let jump = 0, kiteUp = 0, loopA = 0;
     // słaby wiatr: < 12 kn kite przepada (stall), szarpie mocą; ≤ 7 kn leży na wodzie jak tratwa
@@ -1882,7 +1906,7 @@ function step(dt, t) {
     const tips = flyKite(s.kiteM, s.x, y + 1.1, s.z, kx, ky, kz); if (fl < .98) { s.kiteM.rotateX(-1.35 * (1 - fl)); s.kiteM.updateMatrixWorld(); } setLines(s.lines, _a.set(s.x, y + 1.1, s.z), tips);
   }
   for (const arr of [dyn.surfers, dyn.wingers]) for (const s of arr) {
-    s.vf = smooth(5.5, 13, wind.kn); const p = moveRider(s, dt, t, .4), ok = !!p; s.grp.visible = s.wake.mesh.visible = ok; if (!ok) { s.wake.reset(); continue; } if (s.vf < .15) s.wake.reset();
+    s.vf = smooth(5.5, 13, wind.kn); const p = closingRider(s, dt, t) ? null : moveRider(s, dt, t, .4), ok = !!p; s.grp.visible = s.wake.mesh.visible = ok; if (!ok) { s.wake.reset(); continue; } if (s.vf < .15) s.wake.reset();
     const [x, z] = p; s.grp.position.set(x, lv, z); s.grp.rotation.y = dAng + (s.dir > 0 ? 0 : Math.PI); s.grp.scale.z = s.dir > 0 ? 1 : -1;
     s.tt += dt; if (s.tt > .12) { s.tt = 0; s.wake.push(x, z); } s.wake.update();
   }

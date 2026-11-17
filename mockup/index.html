@@ -130,6 +130,7 @@ fitCam();
 const controls = new MapControls(cam, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor = .12; controls.zoomToCursor = true;
 controls.minZoom = .3; controls.maxZoom = 22; controls.maxPolarAngle = 1.25;
+controls.zoomSpeed = 4.5; controls.panSpeed = 1.2;   // szybki zoom kółkiem i gestem szczypania na gładziku
 controls.target.set(158, 0, 62);
 let tilted = false;
 function setView(polar, az) {

@@ -1497,7 +1497,7 @@ function updateZone(dt, t) {
   if (ZONE.boat) ZONE.boat.text = (P.state === 'circle' || P.state === 'go') ? SHOUTS[Math.floor(t / 2.6) % SHOUTS.length] : '';
 }
 function moveRider(r, dt, t, minD) {
-  const nu = r.u + r.dir * r.v * (.6 + .4 * wind.kn / 18) * dt, np = riderPos(r, t, nu);
+  const nu = r.u + r.dir * r.v * (r.vf ?? 1) * (.6 + .4 * wind.kn / 18) * dt, np = riderPos(r, t, nu);
   if (Math.abs(nu) > r.L || depthAt(np[0], np[1]) < minD) r.dir = -r.dir; else r.u = nu;
   let p = riderPos(r, t, r.u);
   if (depthAt(p[0], p[1]) < minD * .8) {
@@ -1724,7 +1724,7 @@ function updateSessions(dt, t) {
     const zenith = () => windowPos(sk.x, sk.m.position.y, sk.z, Math.PI / 2, sk.Lr);
     switch (sk.state) {
       case 'parked': sk.parkM.visible = true; sk.kiteM.visible = sk.lines.visible = false; place(sk);
-        if (sk.t <= 0) { const f = BBOYS.find(b => !b.busy); if (waterOK && f) { f.busy = sk; sk.bb = f; sk.state = 'prep'; sk.picked = false; } else sk.t = 6; } break;
+        if (sk.t <= 0) { const f = BBOYS.find(b => !b.busy); if (waterOK && wind.kn >= 11 && f) { f.busy = sk; sk.bb = f; sk.state = 'prep'; sk.picked = false; } else sk.t = 6; } break;
       case 'prep': {                                    // beachboy bierze kite z trawy i niesie go na krawędź okna; kiter idzie na plażę
         if (!sk.picked) { if (walkTo(bb, sk.P[0], sk.P[1], 1.6, dt)) { sk.picked = true; sk.parkM.visible = false; bb.carry = carryKite(sk.k); bb.m.add(bb.carry); } }
         else { const a1 = walkTo(bb, H[0], H[1], 1.5, dt), a2 = walkTo(sk, S0[0], S0[1], 1.3, dt); if (a1) bb.say = 'GO LEFT! GO LEFT! 👈'; if (a1 && a2) { bb.m.remove(bb.carry); bb.carry = null; sk.state = 'launch'; sk.t = 5.5; sk.kiteM.visible = sk.lines.visible = true; kiteAt(windowPos(sk.x, sk.m.position.y, sk.z, .06, sk.Lr), true); } }
@@ -1735,7 +1735,7 @@ function updateSessions(dt, t) {
       case 'walkin': kiteAt(zenith()); if (walkTo(sk, W[0], W[1], 1.1, dt)) { sk.state = 'ride'; sk.cx = shoreX(sk.zs) + 36; sk.cz = sk.zs; sk.u = -sk.L * .9; sk.dir = 1; sk.t = R(60, 120); sk.board.visible = true; sk.wake.reset(); sk.m.children[0].rotation.x = -.32; } place(sk); break;
       case 'ride': {
         const pr = moveRider(sk, dt, t, .35);
-        if (!pr || sk.t <= 0) { sk.state = 'return'; sk.board.visible = false; sk.m.children[0].rotation.x = 0; sk.wake.reset(); break; }
+        if (!pr || sk.t <= 0 || wind.kn < 9) { sk.state = 'return'; sk.board.visible = false; sk.m.children[0].rotation.x = 0; sk.wake.reset(); break; }
         sk.x = pr[0]; sk.z = pr[1]; sk.ko += (sk.dir * 10 - sk.ko) * Math.min(1, dt * .7);
         sk.m.position.set(sk.x, lv + .02, sk.z); sk.m.rotation.y = Math.atan2(wind.down.x, wind.down.z) + sk.dir * .35;
         sk.board.position.set(sk.x, lv + .02, sk.z); sk.board.rotation.y = Math.atan2(-wind.side.z * sk.dir, wind.side.x * sk.dir);
@@ -1827,6 +1827,15 @@ function step(dt, t) {
     const p = k === JW.k && JW.wc ? null : moveRider(k, dt, t, .35), ok = !!p; k.grp.visible = k.kiteM.visible = k.lines.visible = k.wake.mesh.visible = ok; if (k.splash && !ok) k.splash.material.opacity = 0; if (!ok) { k.wake.reset(); continue; }
     let [x, z] = p; k.ko += (k.dir * 10 - k.ko) * Math.min(1, dt * .7);
     let jump = 0, kiteUp = 0, loopA = 0;
+    // słaby wiatr: < 12 kn kite przepada (stall), szarpie mocą; ≤ 7 kn leży na wodzie jak tratwa
+    const PW = smooth(6.5, 14, wind.kn), flat = wind.kn <= 7;
+    if (!flat && !k.stall && Math.random() < (1 - PW) * .1 * dt) k.stall = R(3, 9);
+    if (k.stall) { k.stall -= dt; if (k.stall <= 0) k.stall = 0; }
+    if (!k.surge && wind.kn < 13 && wind.kn > 7 && Math.random() < .08 * dt) k.surge = 1.2;
+    if (k.surge) k.surge = Math.max(0, k.surge - dt);
+    const downT = flat || k.stall ? 1 : 0; k.down = (k.down || 0) + (downT - (k.down || 0)) * Math.min(1, dt * (downT ? 1.1 : .45));
+    k.vf = (1 - smooth(.2, .7, k.down)) * (.25 + .75 * PW) * (k.surge ? 1.8 : 1);
+    if (wind.kn < 12) { k.trick = Math.max(k.trick ?? 0, 3); TALK.jumpT = k.name === 'Iwona' ? -1 : TALK.jumpT; }
     if (k.name === 'Krzysztof') {                    // backroll: wybicie, niedokręcony obrót z machaniem, gleba w wodę, chwila leżenia, waterstart
       k.trick = (k.trick ?? 5) - dt; const T = -k.trick;
       if (k.trick < 0 && T < 1.9) { const p = T / 1.9; jump = Math.sin(Math.PI * p) * 3.6; kiteUp = 4 * Math.sin(Math.PI * p); k.grp.rotation.x = -p * TAU * .78 + Math.sin(p * 23) * .22; k.grp.rotation.z = Math.sin(p * 9) * .35; }
@@ -1849,23 +1858,27 @@ function step(dt, t) {
       if (k.trick > 0) k.drag = Math.max(0, (k.drag || 0) - dt * 1.2);
       x += wind.down.x * (k.drag || 0); z += wind.down.z * (k.drag || 0);
     }
-    k.grp.position.set(x, lv + .02 + jump, z); k.grp.rotation.y = dAng + k.dir * .35;
+    k.grp.position.set(x, lv + .02 + jump - k.down * .55, z); k.grp.rotation.y = dAng + k.dir * .35 * (1 - k.down); k.board.visible = k.down < .6; if (k.down > .5) k.wake.reset();
     k.board.rotation.y = Math.atan2(-wind.side.z * k.dir, wind.side.x * k.dir) - k.grp.rotation.y;
-    const lo = Math.sin(loopA) * 8 * k.dir, tips = flyKite(k.kiteM, x, lv + 1.1 + jump, z, x + wind.down.x * 17 + wind.side.x * (k.ko + lo), Math.max(1.5, 13 - Math.abs(k.ko) * .25 + kiteUp + (Math.cos(loopA) - 1) * 6), z + wind.down.z * 17 + wind.side.z * (k.ko + lo));
+    const lo = Math.sin(loopA) * 8 * k.dir, sg = k.surge ? Math.sin(t * 9) * 2.5 : 0, dn = smooth(0, 1, k.down);
+    const ax = x + wind.down.x * 17 + wind.side.x * (k.ko + lo + sg), az = z + wind.down.z * 17 + wind.side.z * (k.ko + lo + sg), ay = Math.max(1.5, 13 - Math.abs(k.ko) * .25 + kiteUp + (Math.cos(loopA) - 1) * 6 + (1 - PW) * -3);
+    const wx = x + wind.down.x * 20, wz = z + wind.down.z * 20, wy = lv + .25 + Math.sin(t * 1.3 + k.ph) * .06;          // kite na wodzie
+    const tips = flyKite(k.kiteM, x, lv + 1.1 + jump - k.down * .55, z, ax + (wx - ax) * dn, ay + (wy - ay) * dn, az + (wz - az) * dn);
+    if (dn > .02) { k.kiteM.rotateX(-1.35 * dn); k.kiteM.rotateZ(Math.sin(t * .8 + k.ph) * .08 * dn); k.kiteM.updateMatrixWorld(); }
     setLines(k.lines, _a.set(x, lv + 1.1 + Math.max(0, jump), z), tips);
     k.tt += dt; if (k.tt > .1) { k.tt = 0; k.wake.push(x, z); } k.wake.update();
   }
   for (const s of dyn.students) {
     const d = depthAt(s.x, s.z), y = Math.max(lv, heightAt(s.x, s.z)) - Math.min(.35, Math.max(0, d)) * .6;
     s.body.position.set(s.x, y, s.z); s.inst.position.set(s.x - 1.3, y, s.z - .7); s.inst.rotation.y = .5;
-    s.fly = (s.fly ?? 1) + ((d > .08 ? 1 : 0) - (s.fly ?? 1)) * Math.min(1, dt * .35);                 // brak wody → kite ląduje na krawędzi okna
+    s.fly = (s.fly ?? 1) + ((d > .08 && wind.kn >= 8.5 ? 1 : 0) - (s.fly ?? 1)) * Math.min(1, dt * .35);                 // brak wody → kite ląduje na krawędzi okna
     const sw = Math.sin(t * .7 + s.ph) * 8, dw = 12 + Math.cos(t * 1.4 + s.ph) * 2, fl = smooth(0, 1, s.fly), th = .06 + (Math.PI / 2 - .06) * fl * .55;
     const ex = s.x + wind.side.x * Math.cos(th) * 13, ez = s.z + wind.side.z * Math.cos(th) * 13, ey = y + .4 + Math.sin(th) * 12;
     const kx = ex + (s.x + wind.side.x * sw + wind.down.x * dw - ex) * fl, kz = ez + (s.z + wind.side.z * sw + wind.down.z * dw - ez) * fl, ky = ey + (6.5 + Math.cos(t * 1.4 + s.ph) * 2 - ey) * fl;
-    const tips = flyKite(s.kiteM, s.x, y + 1.1, s.z, kx, ky, kz); setLines(s.lines, _a.set(s.x, y + 1.1, s.z), tips);
+    const tips = flyKite(s.kiteM, s.x, y + 1.1, s.z, kx, ky, kz); if (fl < .98) { s.kiteM.rotateX(-1.35 * (1 - fl)); s.kiteM.updateMatrixWorld(); } setLines(s.lines, _a.set(s.x, y + 1.1, s.z), tips);
   }
   for (const arr of [dyn.surfers, dyn.wingers]) for (const s of arr) {
-    const p = moveRider(s, dt, t, .4), ok = !!p; s.grp.visible = s.wake.mesh.visible = ok; if (!ok) { s.wake.reset(); continue; }
+    s.vf = smooth(5.5, 13, wind.kn); const p = moveRider(s, dt, t, .4), ok = !!p; s.grp.visible = s.wake.mesh.visible = ok; if (!ok) { s.wake.reset(); continue; } if (s.vf < .15) s.wake.reset();
     const [x, z] = p; s.grp.position.set(x, lv, z); s.grp.rotation.y = dAng + (s.dir > 0 ? 0 : Math.PI); s.grp.scale.z = s.dir > 0 ? 1 : -1;
     s.tt += dt; if (s.tt > .12) { s.tt = 0; s.wake.push(x, z); } s.wake.update();
   }

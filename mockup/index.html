@@ -1500,10 +1500,11 @@ function spawnDynamic() {
     k.grp = new THREE.Group(); k.body = personMesh(i === 1 ? IWONA : i === 2 ? JASIU : randPerson(true), 'ride'); scene.remove(k.body); k.board = gearBoard('twin');
     k.grp.add(k.body, k.board); k.grp.rotation.order = 'YXZ'; scene.add(k.grp);
     if (i === 1) { k.name = 'Iwona'; k.cx = shoreX(62) + 27; k.cz = 62; k.L = 9; k.v = 4.5; k.drift = 1.5; dyn.npcs.push({ name: 'Iwona (klientka)', obj: k.body }); TALK.iwona = k.body; TALK.bI = bubble(k.body); k.splash = mkSplash(); }
-    if (i === 2) { k.name = 'Jasiu'; k.cx = 248; k.cz = 48; dyn.npcs.push({ name: 'Jasiu (klient)', obj: k.body }); k.splash = mkSplash(); }
+    if (i === 2) { k.name = 'Jasiu'; k.cx = 248; k.cz = 48; k.splash = mkSplash(); JW.k = k; JW.mark = new THREE.Object3D(); scene.add(JW.mark); dyn.npcs.push({ name: 'Jasiu (klient)', obj: JW.mark });
+      JW.wcBody = personMesh({ ...JASIU, harness: false }, 'sit'); JW.wcBody.position.set(121.2, LAND + .42, 30.35); JW.wcBody.visible = false; JW.b = bubble(JW.wcBody, 'think'); }
     if (i === 0) { k.name = 'Krzysztof'; k.cz = 70; k.cx = 235; dyn.npcs.push({ name: 'Krzysztof (klient)', obj: k.body }); k.splash = new THREE.Mesh(new THREE.RingGeometry(.6, 1.6, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false })); k.splash.renderOrder = 2; scene.add(k.splash); AO_HIDE.push(k.splash); } k.kiteM = kiteMesh(k.kite, k.span, 'fly'); scene.add(k.kiteM); k.lines = lines(2); dyn.kiters.push(k);
   }
-  { const dd = personMesh(DIDA, 'stand'); dd.position.set(shoreX(62) + 21, 0, 64); TALK.dida = dd; TALK.bD = bubble(dd); dyn.npcs.push({ name: 'Dida (instruktorka)', obj: dd }); }
+  { const dd = personMesh(DIDA, 'stand'); dd.position.set(shoreX(62) + 21, 0, 64); TALK.dida = dd; TALK.bD = bubble(dd); dyn.npcs.push({ name: 'Dida (instruktor)', obj: dd }); }
   // kursanci z instruktorami kite (flota Core)
   const INSTR = [['Ahmed — szef stacji', TEAM.Ahmed], ['Atamish', TEAM.Atamish], ['Moktar', TEAM.Moktar], ['Abdallah', TEAM.Abdallah], ['Khaled', TEAM.Khaled], ['Mahmoudi', TEAM.Mahmoudi]];
   for (let i = 0; i < INSTR.length; i++) {
@@ -1591,13 +1592,14 @@ function carryBoard(ws) { const g = new THREE.Group(), b = ws ? new THREE.Mesh(w
   if (ws) { const sl = new THREE.Mesh(SAIL_G, pick(sailMats)); sl.castShadow = true; sl.rotation.set(-Math.PI / 2 + .25, 0, Math.PI / 2); sl.position.set(-.2, 2.05, 1.6); g.add(sl); } return g; }
 // plan pracy: kroki [cel, akcja, czas]; akcje: pick-kite / pick-board / pick-ws / drop / rinse / idle
 const IWONA = { female: true, skin: 0xecc9ab, shirt: 0x1e1e22, hair: 0x6b4a2a, shorts: 0x1e1e22, harness: true, helmet: 0xf2c81e, helmetLoose: true };
-const DIDA = { female: true, skin: 0xe2b896, shirt: 0x1e1e22, hair: 0x2a1c14, shorts: 0x1e1e22, longHair: true };
+const DIDA = { skin: 0xe2b896, shirt: 0x1e1e22, hair: 0x2a1c14, shorts: 0x1e1e22, longHair: true, beard: 0x2a1c14 };   // Dida — facet z długimi włosami
 const JASIU = { skin: 0xe6b894, shirt: 0x2a2e36, hair: 0xc8aa6e, shorts: 0x1e1e22, harness: true };
 const MAGDA = { female: true, skin: 0xecc9ab, shirt: 0xf2f2f2, hair: 0x5a3c23, shorts: 0x2d4f7a, longHair: true, shadesOnHead: true };
 // scenka: Dida uczy Iwonę skoku i się wkurza; Magda myśli tylko o Sycylii
 const TALK = { t: 0, i: 0, jumpT: -1 };
+const JW = { wc: false, t: 35, k: null, mark: null, wcBody: null, b: null };   // Jasiu: woda ↔ kibel
 const SCRIPT = [['dida', 'Iwona! Krawędź, napnij linki, bar do siebie i HOP!', 3.6, 'stand'], ['jump', '', 2.8], ['dida', 'No kurde, Iwona!!! Ile razy mam mówić — KRAWĘDŹ!', 3.2, 'angry'],
-  ['iwona', 'Skoczyłabyś!', 2.6], ['dida', 'Grrr… Dobra. Jeszcze raz. Od początku.', 3, 'stand'], ['pause', '', 2.5]];
+  ['iwona', 'Skoczyłbyś!', 2.6], ['dida', 'Grrr… Dobra. Jeszcze raz. Od początku.', 3, 'stand'], ['pause', '', 2.5]];
 const SICILY = ['Sycylia… 🍋', 'Tani lot do Katanii w październiku?', 'San Vito Lo Capo — tam też wieje…', 'Cannoli, arancini, Etna… i wiatr', 'A może Marsala? Laguna jak tu…', 'Ile kosztuje kite bag w Ryanairze…', 'Palermo → Trapani autem, 1,5 h…'];
 const BUBBLES = [];
 function bubble(obj, cls = '') { const d = document.createElement('div'); d.className = 'bub ' + cls; d.style.display = 'none'; labelsEl.appendChild(d); const b = { obj, d, text: '' }; BUBBLES.push(b); return b; }
@@ -1618,9 +1620,15 @@ function updateTalk(dt, t) {
     for (let i = 0; i < SMOKE.n; i++) { SMOKE.age[i] += dt; if (SMOKE.age[i] > 2.6) { SMOKE.age[i] -= 2.6; P.setXYZ(i, h.x, h.y, h.z); } else P.setXYZ(i, P.getX(i) + (wind.down.x * .5 + (Math.random() - .5) * .3) * dt, P.getY(i) + .35 * dt, P.getZ(i) + (wind.down.z * .5 + (Math.random() - .5) * .3) * dt); }
     P.needsUpdate = true;
   }
+  if (JW.k) {
+    JW.t -= dt; if (JW.t <= 0) { JW.wc = !JW.wc; JW.t = JW.wc ? R(20, 35) : R(40, 70); JW.k.trick = R(4, 8); JW.k.drag = 0; JW.k.wake.reset(); }
+    JW.wcBody.visible = JW.wc; JW.b.text = JW.wc && (t % 9) < 4 ? pick0(['🚽 …', 'Zaraz wracam na loopy…', 'Kto zabrał papier?!'], Math.floor(t / 9)) : '';
+    (JW.wc ? JW.wcBody : JW.k.body).getWorldPosition(JW.mark.position);
+  }
   if (TALK.bM) TALK.bM.text = (t % 5.5) < 4.3 ? SICILY[Math.floor(t / 5.5) % SICILY.length] : '';
 }
 const SMOKE = (() => { const n = 46, g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3).fill(-999), 3)); const p = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xd4d4d4, size: .22, transparent: true, opacity: .32, depthWrite: false })); p.frustumCulled = false; scene.add(p); return { n, p, age: Float32Array.from({ length: n }, (_, i) => i / n * 2.6) }; })();
+const pick0 = (a, i) => a[i % a.length];
 function mkSplash() { const m = new THREE.Mesh(new THREE.RingGeometry(.6, 1.6, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false })); m.renderOrder = 2; scene.add(m); AO_HIDE.push(m); return m; }
 const MANIAS = { skin: 0xe2b896, shirt: 0x2d4f7a, hair: 0x3a2a1e, shorts: 0xd8d0b8, shadesOnHead: true }, BRAILI = { skin: 0xd9a77e, shirt: 0xd9a77e, hair: 0x5a3c23, shorts: 0xf2c81e, hairStyle: 'bald' };   // Brailey: łysy, tylko żółte spodenki
 const PLANS = {
@@ -1744,7 +1752,7 @@ function step(dt, t) {
   const lv = uLevel.value, levelChanged = lastLevel === null || Math.abs(lv - lastLevel) > .01; if (levelChanged) lastLevel = lv;
   const dAng = Math.atan2(wind.down.x, wind.down.z);
   for (const k of dyn.kiters) {
-    const p = moveRider(k, dt, t, .35), ok = !!p; k.grp.visible = k.kiteM.visible = k.lines.visible = k.wake.mesh.visible = ok; if (!ok) { k.wake.reset(); continue; }
+    const p = k === JW.k && JW.wc ? null : moveRider(k, dt, t, .35), ok = !!p; k.grp.visible = k.kiteM.visible = k.lines.visible = k.wake.mesh.visible = ok; if (k.splash && !ok) k.splash.material.opacity = 0; if (!ok) { k.wake.reset(); continue; }
     let [x, z] = p; k.ko += (k.dir * 10 - k.ko) * Math.min(1, dt * .7);
     let jump = 0, kiteUp = 0, loopA = 0;
     if (k.name === 'Krzysztof') {                    // backroll: wybicie, niedokręcony obrót z machaniem, gleba w wodę, chwila leżenia, waterstart
@@ -1835,8 +1843,8 @@ const CREW = [
   ['Abo Abdo — wypożyczalnia', 'abo-abdo', 'Abo Abdo', 'Wypożyczalnia', SM_CYAN], ['Fotograf', '', 'Fotograf', 'Zdjęcia na plaży — brak zdjęcia', 0xf5d21e],
   ['Fotograf', '', 'Fotograf', 'Zdjęcia na plaży — brak zdjęcia', 0xf5d21e], ['Felix — kot stacji', 'felix', 'Felix', 'Kot stacji', 0xf4f4f2],
   ['Manias (klient)', '', 'Manias', 'Klient — zawsze kręci się przy fotografie', 0x2d4f7a], ['Brailey (klient)', '', 'Brailey', 'Klient — tylko żółte spodenki', 0xf2c81e], ['Krzysztof (klient)', '', 'Krzysztof', 'Klient — bardzo nieładne backrolle', 0x1e1e22],
-  ['Dida (instruktorka)', '', 'Dida', 'Uczy Iwonę skoku i się wkurza', 0x1e1e22], ['Iwona (klientka)', '', 'Iwona', 'Kask zjeżdża z głowy, próbuje skoczyć', 0xf2c81e],
-  ['Jasiu (klient)', '', 'Jasiu', 'Loopy — w połowie się rozmyśla', 0x2a2e36], ['Magda (klientka)', '', 'Magda', 'Myśli tylko o Sycylii', 0xf2f2f2],
+  ['Dida (instruktor)', '', 'Dida', 'Długie włosy; uczy Iwonę skoku i się wkurza', 0x1e1e22], ['Iwona (klientka)', '', 'Iwona', 'Kask zjeżdża z głowy, próbuje skoczyć', 0xf2c81e],
+  ['Jasiu (klient)', '', 'Jasiu', 'Loopy (w połowie się rozmyśla) albo siedzi w kiblu', 0x2a2e36], ['Magda (klientka)', '', 'Magda', 'Myśli tylko o Sycylii', 0xf2f2f2],
 ];
 const teamEl = document.getElementById('team'), cardsEl = document.getElementById('cards');
 const ring = new THREE.Mesh(new THREE.RingGeometry(.55, .8, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x22b8e6, transparent: true, depthWrite: false }));

@@ -776,7 +776,8 @@ const CLIPS = { man: { stand: 'HumanArmature|Man_Idle', walk: 'HumanArmature|Man
 // dodatki przypięte do głowy: czapka, okulary, broda, aparat
 function accessoryGeom(p) {
   const parts = [], add = (g, hex, x, y, z, sx = 1, sy = 1, sz = 1) => { xf(g, x, y, z, 0, 0, 0, sx, sy, sz); paint(g, hex); parts.push(g.index ? g.toNonIndexed() : g); };
-  if (p.cig) { add(cyl(.006, .006, .08, 6).rotateZ(Math.PI / 2), 0xf4f4f0, .04, -.05, .14); add(cyl(.0065, .0065, .012, 6).rotateZ(Math.PI / 2), 0xff6a20, .085, -.05, .14); }
+  if (p.hairCap) { add(sph(.14, 16, 12), p.hair, 0, .035, -.02, 1.08, .95, 1.15); add(cap(.13, .38), p.hair, 0, -.18, -.1, 1.25, 1, .7); for (const sx of [-1, 1]) add(cap(.05, .34), p.hair, sx * .12, -.16, -.01); }
+  if (p.cig) { add(cyl(.011, .011, .095, 8).rotateX(Math.PI / 2), 0xf6f4ee, .02, -.07, .17); add(cyl(.0115, .0115, .03, 8).rotateX(Math.PI / 2), 0xd8a060, .02, -.07, .135); add(cyl(.012, .012, .014, 8).rotateX(Math.PI / 2), 0xff5a10, .02, -.07, .222); }
   if (p.helmet) add(new THREE.SphereGeometry(.15, 14, 8, 0, TAU, 0, Math.PI / 2), p.helmet, 0, .02, 0);
   if (p.longHair) { add(cap(.1, .32), p.hair, 0, -.2, -.1, 1.35, 1, .75); for (const sx of [-1, 1]) add(cap(.035, .28), p.hair, sx * .1, -.17, -.02); }
   if (p.cap) { add(cyl(.13, .13, .08, 14), p.cap, 0, .12, 0); add(box(.18, .02, .12), p.capBrim || p.cap, 0, .09, p.capBack ? -.17 : .17); }
@@ -814,7 +815,7 @@ function staticPerson(p, pose, x, y, z, ry = 0, rx = 0) {
 // ekipa (dopasowanie zdjęć z oficjalnej listy zespołu + wskazówki Kuby)
 const TEAM = {
   Peter: { skin: 0xe6b894, shirt: 0x7d8a9a, hair: 0xa8a8a8, shorts: 0x2a2a2e, beard: 0x9a9a9a, shadesOnHead: true },
-  Petra: { female: true, skin: 0xecc9ab, shirt: 0x7a3fb0, hair: 0x6e1a2a, shorts: 0x22324a, longHair: true, cig: true },
+  Petra: { female: true, skin: 0xecc9ab, shirt: 0x7a3fb0, hair: 0x7a1f30, shorts: 0x22324a, hairCap: true, cig: true },   // bordowe włosy, papieros non stop
   HassanOffice: { skin: 0xa8734f, shirt: SM_CYAN, hair: 0x141414, shorts: 0x2a2a2e, hairStyle: 'curly', beard: 0x141414, build: 1.35 },
   Mahmoud: { skin: 0x9a6b4c, shirt: SM_CYAN, hair: 0x8a8a8a, shorts: 0x2a2a2e, beard: 0x8a8a8a, glasses: 0x8a5a20 },
   Moktar: { skin: 0xa8734f, shirt: SM_CYAN, hair: 0x141414, shorts: 0x1e1e22, cap: 0x8a8e94, capBack: true, shadesOnHead: true, build: 1.45 },
@@ -1616,8 +1617,8 @@ function updateTalk(dt, t) {
   if (TALK.petra) {
     const cough = (t % 7.3) < 1.4, ask = TALK.petra.acting === 'ask';
     TALK.bP.text = cough ? '*khe… khe… KHE…* 🚬' : ask ? 'You registered with the group?' : '';
-    const P = SMOKE.p.geometry.attributes.position, h = new V3(); TALK.petra.m.getWorldPosition(h); const ry = TALK.petra.m.rotation.y; h.x += Math.sin(ry) * .2; h.z += Math.cos(ry) * .2; h.y += 1.55;
-    for (let i = 0; i < SMOKE.n; i++) { SMOKE.age[i] += dt; if (SMOKE.age[i] > 2.6) { SMOKE.age[i] -= 2.6; P.setXYZ(i, h.x, h.y, h.z); } else P.setXYZ(i, P.getX(i) + (wind.down.x * .5 + (Math.random() - .5) * .3) * dt, P.getY(i) + .35 * dt, P.getZ(i) + (wind.down.z * .5 + (Math.random() - .5) * .3) * dt); }
+    const P = SMOKE.p.geometry.attributes.position, h = new V3(), acc = ACCS.find(a => a.grp === TALK.petra.m); if (acc) h.copy(acc.am.position); else { TALK.petra.m.getWorldPosition(h); h.y += 1.55; } const ry = TALK.petra.m.rotation.y; h.x += Math.sin(ry) * .24; h.z += Math.cos(ry) * .24; h.y -= .06;
+    for (let i = 0; i < SMOKE.n; i++) { SMOKE.age[i] += dt; if (SMOKE.age[i] > 2.6) { SMOKE.age[i] -= 2.6; P.setXYZ(i, h.x, h.y, h.z); } else P.setXYZ(i, P.getX(i) + (wind.down.x * .7 + (Math.random() - .5) * .35) * dt, P.getY(i) + .45 * dt, P.getZ(i) + (wind.down.z * .5 + (Math.random() - .5) * .3) * dt); }
     P.needsUpdate = true;
   }
   if (JW.k) {
@@ -1627,7 +1628,7 @@ function updateTalk(dt, t) {
   }
   if (TALK.bM) TALK.bM.text = (t % 5.5) < 4.3 ? SICILY[Math.floor(t / 5.5) % SICILY.length] : '';
 }
-const SMOKE = (() => { const n = 46, g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3).fill(-999), 3)); const p = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xd4d4d4, size: .22, transparent: true, opacity: .32, depthWrite: false })); p.frustumCulled = false; scene.add(p); return { n, p, age: Float32Array.from({ length: n }, (_, i) => i / n * 2.6) }; })();
+const SMOKE = (() => { const n = 80, g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3).fill(-999), 3)); const p = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xe2e2e2, size: .38, transparent: true, opacity: .42, depthWrite: false })); p.frustumCulled = false; scene.add(p); return { n, p, age: Float32Array.from({ length: n }, (_, i) => i / n * 2.6) }; })();
 const pick0 = (a, i) => a[i % a.length];
 function mkSplash() { const m = new THREE.Mesh(new THREE.RingGeometry(.6, 1.6, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false })); m.renderOrder = 2; scene.add(m); AO_HIDE.push(m); return m; }
 const MANIAS = { skin: 0xe2b896, shirt: 0x2d4f7a, hair: 0x3a2a1e, shorts: 0xd8d0b8, shadesOnHead: true }, BRAILI = { skin: 0xd9a77e, shirt: 0xd9a77e, hair: 0x5a3c23, shorts: 0xf2c81e, hairStyle: 'bald' };   // Brailey: łysy, tylko żółte spodenki

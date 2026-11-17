@@ -1062,8 +1062,8 @@ function buildWorld() {
   base.add('turf', gridMesh((u, v) => { const z = 30.6 + v * 75.4, xl = z < 57.6 ? 181.8 : z < 64 ? 181.8 - (z - 57.6) / 6.4 * 5.5 : 176.3 + (z - 64) / 42 * 9.2, xr = shoreX(z) - 1.4; return [xl + u * (xr - xl), z]; }, 16, 80, .03, 2));
   base.add('turf', gridMesh(quad([160, 69.2], [180, 69.2], [158, 74], [181, 74]), 16, 5, .03, 2));   // trawa dopiero u podnóża chill-outu
   base.add('turf', gridMesh(strip([167.4, 65.6], [182.2, 77.7], 3.8), 3, 14, .035, 2));        // pas A
-  base.add('turf', gridMesh(strip([161.5, 74.3], [184.8, 96.6], 3.8), 3, 24, .035, 2));        // pas B
-  base.add('turfLight', gridMesh(strip([157.8, 78.6], [186.3, 106.2], 6.4), 4, 30, .04, 2));   // pas C
+  base.add('turf', gridMesh(strip([157.1, 79.7], [180.4, 102], 3.8), 3, 24, .035, 2));          // pas B (przy drodze)
+  base.add('turfLight', gridMesh(strip([153.4, 84], [181.9, 111.6], 6.4), 4, 30, .04, 2));      // pas C (przy drodze)
 
   // ---------- toalety i prysznice tuż za halą: wszędzie kafle, wejścia bez drzwi ----------
   { const TX = 117, TZ = 29.3, TW = 18, TD = 7.1;
@@ -1293,7 +1293,7 @@ function buildWorld() {
   S(90);
   const spots = [];
   for (let i = 0; i < 22; i++) { const z = R(32, 104), xl = z < 58 ? 182 : z < 64 ? 179 : 177 + (z - 64) / 42 * 9.2; spots.push([R(xl + 2, shoreX(z) - 4), z]); }
-  for (const [a, b] of [[[161.5, 74.3], [184.8, 96.6]], [[157.8, 78.6], [186.3, 106.2]]]) for (let k = 0; k < 4; k++) { const t = R(.15, .9); spots.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); }
+  for (const [a, b] of [[[157.1, 79.7], [180.4, 102]], [[153.4, 84], [181.9, 111.6]]]) for (let k = 0; k < 4; k++) { const t = R(.15, .9); spots.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); }
   for (const [x, z] of spots) {
     if (Math.hypot(x - 186, z - 38) < 3.5) continue;
     const span = R(6.5, 9.5), m = kiteMesh(pickKite(.65), span, 'park'), tilt = new THREE.Group(), root = new THREE.Group();
@@ -1696,7 +1696,7 @@ const labelsEl = document.getElementById('labels');
 const LABELS = [
   [143, 6, 44, 'Hala windsurf (brama od myjki)'], [161.5, 5, 47, 'Magazyn kite'], [172.6, 5, 38, 'Bar'], [170, 5, 52.8, 'Biuro'], [170.6, 2, 58.2, 'Siedziska ekipy'], [176.6, 2, 53.2, 'Fotograf + komputer'], [175.3, 2.5, 54.2, 'Komputer z wiatrem'], [177.4, 2, 30.6, 'Mini chill'], [300, 3, 238, 'Molo i port jachtowy'], [158.4, 5, 35, 'Warsztat'], [126, 5, 33, 'Toalety · prysznice'],
   [141.5, 6, 62, 'Namioty — magazyn'], [170.3, 6, 63, 'Chill-out (wzniesienie)'], [140, 1, 54.5, 'Chodnik do toalet'], [184, 1, 46, 'Trawka do rozkładania kitów'],
-  [170, 1, 80, 'Przejście dla windsurferów'], [176, 1, 98, 'Pasy trawy do wody'], [188.6, 7, 30.9, 'Wieża ratownika'], [127, 1, 79, 'Łodzie'], [120, 4, 65, 'Szopy'],
+  [171, 1, 85, 'Przejście dla windsurferów'], [168, 1, 100, 'Pasy trawy do wody'], [188.6, 7, 30.9, 'Wieża ratownika'], [127, 1, 79, 'Łodzie'], [120, 4, 65, 'Szopy'],
   [55, 8, 48, 'Wille hotelowe'], [95, 2, 25, 'Falochron'], [93, 1, 108, 'Parking'], [178, 1, 170, 'Droga z południa (do Palm Royale)'], [120, 1, 170, 'Błotniste pole'], [176, 4, 150, 'Parasole z plecionki'],
   [239.5, 4, 130, 'Platforma instruktorska'], [150, 2, 53, 'Myjka: wanna + szlauch'], [130, 3, 64, 'Linki do płukania kitów'],
 ];

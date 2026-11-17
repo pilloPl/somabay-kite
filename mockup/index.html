@@ -1312,7 +1312,20 @@ function buildWorld() {
     if (Math.hypot(x - 186, z - 38) < 3.5) continue;
     const span = R(6.5, 9.5), m = kiteMesh(pickKite(.65), span, 'park'), tilt = new THREE.Group(), root = new THREE.Group();
     tilt.add(m); root.add(tilt); scene.add(root);
-    PARKED.push({ root, tilt, mesh: m, span, home: [x, z, -wind.deg * Math.PI / 180 + R(-.35, .35)], weight: R(.55, 1.6), ph: R(0, 6) });
+    const extra = new THREE.Group(), r0 = rnd();
+    if (r0 < .38) {                                       // linki rozłożone pod wiatr (~20 m) do baru leżącego na trawie
+      const fx = wind.from.x, fz = wind.from.z, px = -fz, pz = fx, Lg = R(16, 21), pts = [];
+      for (const [o0, o1, c] of [[-.35, -.22, 0xd23a2c], [-.12, -.05, 0xb8bcc2], [.12, .05, 0xb8bcc2], [.35, .22, 0x2a6fd6]]) {
+        const ax = x + fx * 1.4 + px * o0 * span / 2, az = z + fz * 1.4 + pz * o0 * span / 2, bx = x + fx * Lg + px * o1, bz = z + fz * Lg + pz * o1;
+        const g = new THREE.BufferGeometry().setFromPoints([0, .25, .5, .75, 1].map(f => new V3(ax + (bx - ax) * f + Math.sin(f * 3 + o0 * 9) * .25 * (1 - f), heightAt(ax + (bx - ax) * f, az + (bz - az) * f) + .04, az + (bz - az) * f)));
+        extra.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: c })));
+      }
+      const bar = new THREE.Mesh(gearBar(0xd23a2c), M.vc); bar.position.set(x + fx * Lg, heightAt(x + fx * Lg, z + fz * Lg) + .03, z + fz * Lg); bar.rotation.set(-Math.PI / 2, 0, Math.atan2(fx, fz)); bar.castShadow = true; extra.add(bar);
+    } else if (r0 < .8) {                                 // bar ze zwiniętymi linkami obok kita
+      const bx = x + R(-2, 2), bz = z + R(1.2, 2.5), bar = new THREE.Mesh(gearBar(0xd23a2c), M.vc); bar.position.set(bx, heightAt(bx, bz) + .03, bz); bar.rotation.set(-Math.PI / 2, 0, R(0, 3)); bar.castShadow = true; extra.add(bar);
+    }
+    scene.add(extra);
+    PARKED.push({ root, tilt, mesh: m, extra, span, home: [x, z, -wind.deg * Math.PI / 180 + R(-.35, .35)], weight: R(.55, 1.6), ph: R(0, 6) });
     if (rnd() < .6) { const b = gearBoard('twin'), bx = x + R(-3, 3), bz = z + R(2, 3.5); b.position.set(bx, heightAt(bx, bz) + .03, bz); b.rotation.y = R(0, 3); scene.add(b); }
   }
   resetParked();
@@ -1505,6 +1518,7 @@ function spawnDynamic() {
       JW.wcBody = personMesh({ ...JASIU, harness: false }, 'sit'); JW.wcBody.position.set(121.2, LAND + .42, 30.35); JW.wcBody.visible = false; JW.b = bubble(JW.wcBody, 'think'); }
     if (i === 0) { k.name = 'Krzysztof'; k.cz = 70; k.cx = 235; dyn.npcs.push({ name: 'Krzysztof (klient)', obj: k.body }); k.splash = new THREE.Mesh(new THREE.RingGeometry(.6, 1.6, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false })); k.splash.renderOrder = 2; scene.add(k.splash); AO_HIDE.push(k.splash); } k.kiteM = kiteMesh(k.kite, k.span, 'fly'); scene.add(k.kiteM); k.lines = lines(2); dyn.kiters.push(k);
   }
+  spawnSessions();
   { const dd = personMesh(DIDA, 'stand'); dd.position.set(shoreX(62) + 21, 0, 64); TALK.dida = dd; TALK.bD = bubble(dd); dyn.npcs.push({ name: 'Dida (instruktor)', obj: dd }); }
   // kursanci z instruktorami kite (flota Core)
   const INSTR = [['Ahmed — szef stacji', TEAM.Ahmed], ['Atamish', TEAM.Atamish], ['Moktar', TEAM.Moktar], ['Abdallah', TEAM.Abdallah], ['Khaled', TEAM.Khaled], ['Mahmoudi', TEAM.Mahmoudi]];
@@ -1588,7 +1602,7 @@ function findPath(ax, az, bx, bz) {
 const POI = { photo1: [176.4, 54.4], photo2: [178.6, 53.7], offseat: [170.6, 59.2], toilets: [119.5, 37.4], bar1: [176.4, 38.5], bar2: [176.4, 47.6], office: [169.6, 55.9], kitestore: [164.7, 56.2], wash: [149.3, 56.2], washR: [154.2, 56.4], chill: [170.3, 63],
   lines: [130, 60.3], lawnN: [186.2, 45], lawnM: [186.6, 66], lawnS: [187, 86], beach1: [184, 126], beach2: [194, 170], parking: [103, 104], boats: [128.5, 79.3], hallS: [146.6, 54.6], hallS2: [151, 54.6], tower: [186, 33], passage: [176, 93] };
 // rzeczy niesione: kite nad głową, deska pod pachą, zestaw windsurfingowy
-function carryKite() { const g = new THREE.Group(), k = kiteMesh(pickKite(.85), 6, 'fly'); k.scale.setScalar(.75); k.position.set(0, 1.85, -.25); g.add(k); return g; }
+function carryKite(kk) { const g = new THREE.Group(), k = kiteMesh(kk || pickKite(.85), 6, 'fly'); k.scale.setScalar(.75); k.position.set(0, 1.85, -.25); g.add(k); return g; }
 function carryBoard(ws) { const g = new THREE.Group(), b = ws ? new THREE.Mesh(wsBoardGeom(pick([0xf4f4f2, 0x1f78d6])), M.vc) : gearBoard('twin'); b.castShadow = true; b.rotation.set(0, Math.PI / 2, Math.PI / 2); b.position.set(.42, 1.05, 0); g.add(b);
   if (ws) { const sl = new THREE.Mesh(SAIL_G, pick(sailMats)); sl.castShadow = true; sl.rotation.set(-Math.PI / 2 + .25, 0, Math.PI / 2); sl.position.set(-.2, 2.05, 1.6); g.add(sl); } return g; }
 // plan pracy: kroki [cel, akcja, czas]; akcje: pick-kite / pick-board / pick-ws / drop / rinse / idle
@@ -1682,6 +1696,63 @@ function updateWorkers(dt, t) {
   if (rinsing) { const P = SPRAY.p.geometry.attributes.position, sx = rinsing.x + Math.sin(rinsing.m.rotation.y) * .5, sz = rinsing.z + Math.cos(rinsing.m.rotation.y) * .5, dx = 151.6 - sx, dz = 57.5 - sz;
     for (let i = 0; i < SPRAY.n; i++) { const f = (SPRAY.ph[i] + t * 1.4) % 1; P.setXYZ(i, sx + dx * f * .8 + (Math.random() - .5) * .05, LAND + 1.1 + f * .5 - f * f * 1.3, sz + dz * f * .8 + (Math.random() - .5) * .05); } P.needsUpdate = true; }
 }
+// krawędź okna wiatru: theta 0 = przy ziemi 90° do wiatru (z boku), PI/2 = zenit
+function windowPos(ox, oy, oz, theta, Lr) { return new V3(ox + wind.side.x * Math.cos(theta) * Lr + wind.down.x * Lr * .12 * Math.sin(theta), oy + .4 + Math.sin(theta) * Lr * .92, oz + wind.side.z * Math.cos(theta) * Lr + wind.down.z * Lr * .12 * Math.sin(theta)); }
+function walkTo(o, tx, tz, sp, dt) { const dx = tx - o.x, dz = tz - o.z, d = Math.hypot(dx, dz); if (d < .35) { setAnim(o.m, 'stand'); return true; } const st = Math.min(d, sp * dt); o.x += dx / d * st; o.z += dz / d * st; o.m.rotation.y = Math.atan2(dx, dz); setAnim(o.m, 'walk'); return false; }
+const SESS = [], BBOYS = [];
+function spawnSessions() {
+  S(700);
+  for (const zs of [66, 75, 84, 92]) {
+    const k = pickKite(.75), sp = R(8, 10.5), sk = { zs, state: 'parked', t: R(4, 30), k, Lr: 22, m: personMesh({ ...randPerson(true) }, 'stand'), kiteM: kiteMesh(k, sp, 'fly'), parkM: kiteMesh(k, sp * .85, 'park'), lines: lines(2), wake: new Wake(),
+      board: gearBoard('twin'), cx: 0, cz: zs, u: 0, L: 22, drift: 3, f: .08, ph: R(0, 6), dir: 1, v: R(6, 9), ko: 0, tt: 0, kp: new V3() };
+    scene.add(sk.kiteM, sk.parkM, sk.board); sk.board.visible = false; sk.kiteM.visible = false; sk.lines.visible = false;
+    sk.P = [shoreX(zs) - 7.5, zs + 1.5]; sk.parkM.position.set(sk.P[0], heightAt(...sk.P), sk.P[1]); sk.parkM.rotation.y = -wind.deg * Math.PI / 180;
+    sk.x = sk.P[0] - 1.2; sk.z = sk.P[1] - 1.5; SESS.push(sk);
+  }
+  for (const [i, z] of [[0, 71], [1, 87]]) {
+    const m = personMesh({ skin: 0x7d5238, shirt: SM_CYAN, hair: 0x141414, shorts: 0x22324a, cap: i ? 0xffffff : null }, 'stand'), b = { m, x: shoreX(z) - 2.5, z, home: [shoreX(z) - 2.5, z], busy: null, carry: null };
+    b.bub = bubble(m); m.position.set(b.x, heightAt(b.x, b.z), b.z); BBOYS.push(b); dyn.npcs.push({ name: 'Beachboy (start)', obj: m });
+  }
+}
+function updateSessions(dt, t) {
+  const lv = uLevel.value, place = o => o.m.position.set(o.x, Math.max(heightAt(o.x, o.z), lv - .45), o.z);
+  for (const b of BBOYS) { b.bub.text = b.say || ''; b.say = ''; }
+  for (const sk of SESS) {
+    const S0 = [shoreX(sk.zs) - 1.6, sk.zs], H = [S0[0] + wind.side.x * sk.Lr * .95, S0[1] + wind.side.z * sk.Lr * .95], W = [shoreX(sk.zs) + 7, sk.zs], waterOK = depthAt(shoreX(sk.zs) + 30, sk.zs) > .42;
+    const bb = sk.bb; sk.t -= dt;
+    const kiteAt = (v, hard) => { if (hard) sk.kp.copy(v); else sk.kp.lerp(v, Math.min(1, dt * 1.6)); const tips = flyKite(sk.kiteM, sk.x, sk.m.position.y + 1.1, sk.z, sk.kp.x, sk.kp.y, sk.kp.z); setLines(sk.lines, _a.set(sk.x, sk.m.position.y + 1.1, sk.z), tips); };
+    const zenith = () => windowPos(sk.x, sk.m.position.y, sk.z, Math.PI / 2, sk.Lr);
+    switch (sk.state) {
+      case 'parked': sk.parkM.visible = true; sk.kiteM.visible = sk.lines.visible = false; place(sk);
+        if (sk.t <= 0) { const f = BBOYS.find(b => !b.busy); if (waterOK && f) { f.busy = sk; sk.bb = f; sk.state = 'prep'; sk.picked = false; } else sk.t = 6; } break;
+      case 'prep': {                                    // beachboy bierze kite z trawy i niesie go na krawędź okna; kiter idzie na plażę
+        if (!sk.picked) { if (walkTo(bb, sk.P[0], sk.P[1], 1.6, dt)) { sk.picked = true; sk.parkM.visible = false; bb.carry = carryKite(sk.k); bb.m.add(bb.carry); } }
+        else { const a1 = walkTo(bb, H[0], H[1], 1.5, dt), a2 = walkTo(sk, S0[0], S0[1], 1.3, dt); if (a1) bb.say = 'GO LEFT! GO LEFT! 👈'; if (a1 && a2) { bb.m.remove(bb.carry); bb.carry = null; sk.state = 'launch'; sk.t = 5.5; sk.kiteM.visible = sk.lines.visible = true; kiteAt(windowPos(sk.x, sk.m.position.y, sk.z, .06, sk.Lr), true); } }
+        place(sk); place(bb); break; }
+      case 'launch': {                                  // kite wznosi się po krawędzi okna do zenitu
+        const q = smooth(0, 1, 1 - sk.t / 5.5); kiteAt(windowPos(sk.x, sk.m.position.y, sk.z, .06 + (Math.PI / 2 - .06) * q, sk.Lr), true); bb.say = 'GO LEFT! GO LEFT! 👈'; bb.m.rotation.y = Math.atan2(sk.x - bb.x, sk.z - bb.z);
+        if (sk.t <= 0) { sk.state = 'walkin'; bb.busy = null; sk.bb = null; } place(sk); place(bb); break; }
+      case 'walkin': kiteAt(zenith()); if (walkTo(sk, W[0], W[1], 1.1, dt)) { sk.state = 'ride'; sk.cx = shoreX(sk.zs) + 36; sk.cz = sk.zs; sk.u = -sk.L * .9; sk.dir = 1; sk.t = R(60, 120); sk.board.visible = true; sk.wake.reset(); sk.m.children[0].rotation.x = -.32; } place(sk); break;
+      case 'ride': {
+        const pr = moveRider(sk, dt, t, .35);
+        if (!pr || sk.t <= 0) { sk.state = 'return'; sk.board.visible = false; sk.m.children[0].rotation.x = 0; sk.wake.reset(); break; }
+        sk.x = pr[0]; sk.z = pr[1]; sk.ko += (sk.dir * 10 - sk.ko) * Math.min(1, dt * .7);
+        sk.m.position.set(sk.x, lv + .02, sk.z); sk.m.rotation.y = Math.atan2(wind.down.x, wind.down.z) + sk.dir * .35;
+        sk.board.position.set(sk.x, lv + .02, sk.z); sk.board.rotation.y = Math.atan2(-wind.side.z * sk.dir, wind.side.x * sk.dir);
+        kiteAt(new V3(sk.x + wind.down.x * 17 + wind.side.x * sk.ko, 13 - Math.abs(sk.ko) * .25, sk.z + wind.down.z * 17 + wind.side.z * sk.ko));
+        sk.tt += dt; if (sk.tt > .1) { sk.tt = 0; sk.wake.push(sk.x, sk.z); } sk.wake.update(); break; }
+      case 'return': kiteAt(zenith()); if (walkTo(sk, S0[0], S0[1], 1.2, dt)) { const f = BBOYS.find(b => !b.busy); if (f) { f.busy = sk; sk.bb = f; sk.state = 'landwait'; } } place(sk); break;
+      case 'landwait': kiteAt(zenith()); if (walkTo(bb, H[0], H[1], 1.7, dt)) { sk.state = 'land'; sk.t = 4.5; } place(sk); place(bb); break;
+      case 'land': {                                    // sprowadzenie po krawędzi okna nisko z boku; beachboy łapie za krawędź natarcia
+        const q = smooth(0, 1, 1 - sk.t / 4.5); kiteAt(windowPos(sk.x, sk.m.position.y, sk.z, Math.PI / 2 - (Math.PI / 2 - .06) * q, sk.Lr), true); bb.m.rotation.y = Math.atan2(sk.x - bb.x, sk.z - bb.z);
+        if (sk.t <= 0) { sk.kiteM.visible = sk.lines.visible = false; bb.carry = carryKite(sk.k); bb.m.add(bb.carry); sk.state = 'park'; } place(sk); place(bb); break; }
+      case 'park': { const a1 = walkTo(bb, sk.P[0] + .8, sk.P[1], 1.5, dt), a2 = walkTo(sk, sk.P[0] - 1.2, sk.P[1] - 1.5, 1.2, dt);   // odnosi kite na trawę i odkłada krawędzią do wiatru
+        if (a1 && bb.carry) { bb.m.remove(bb.carry); bb.carry = null; sk.parkM.visible = true; sk.parkM.rotation.y = -wind.deg * Math.PI / 180; bb.busy = null; sk.bb = null; }
+        if (a1 && a2) { sk.state = 'parked'; sk.t = R(20, 45); } place(sk); if (sk.bb || !bb.busy) place(bb); break; }
+    }
+  }
+  for (const b of BBOYS) if (!b.busy) { walkTo(b, b.home[0], b.home[1], 1.3, dt); place(b); }
+}
 function setLines(L, a, tips) { const P = L.geometry.attributes.position.array; P.set([a.x, a.y, a.z, tips[0].x, tips[0].y, tips[0].z, a.x, a.y, a.z, tips[1].x, tips[1].y, tips[1].z]); L.geometry.attributes.position.needsUpdate = true; }
 const _a = new V3(), _t0 = new V3(), _t1 = new V3();
 function flyKite(km, rx, ry, rz, kx, ky, kz) { km.position.set(kx, ky, kz); km.lookAt(rx, ry, rz); km.updateMatrixWorld(); _t0.copy(km.userData.tips[0]).applyMatrix4(km.matrixWorld); _t1.copy(km.userData.tips[1]).applyMatrix4(km.matrixWorld); return [_t0, _t1]; }
@@ -1689,7 +1760,7 @@ function flyKite(km, rx, ry, rz, kx, ky, kz) { km.position.set(kx, ky, kz); km.l
 // Leżący kite jest bezpieczny, gdy wiatr wchodzi w krawędź natarcia. Im większy kąt, tym bardziej
 // wiatr łapie końcówkę/czaszę: najpierw końcówka się podnosi i trzepocze, potem kite się wyrywa i koziołkuje z wiatrem.
 function resetParked() {
-  for (const k of PARKED) { const [x, z, ry] = k.home; Object.assign(k, { x, z, ry, y: heightAt(x, z), vx: 0, vy: 0, vz: 0, loose: false, floating: false, caught: false, spin: 0, lift: 0 }); k.mesh.position.set(0, 0, 0); k.tilt.rotation.set(0, 0, 0); k.tilt.position.set(0, 0, 0); k.root.position.set(x, k.y, z); k.root.rotation.set(0, ry, 0); k.root.visible = true; }
+  for (const k of PARKED) { const [x, z, ry] = k.home; Object.assign(k, { x, z, ry, y: heightAt(x, z), vx: 0, vy: 0, vz: 0, loose: false, floating: false, caught: false, spin: 0, lift: 0 }); k.mesh.position.set(0, 0, 0); k.tilt.rotation.set(0, 0, 0); k.tilt.position.set(0, 0, 0); k.root.position.set(x, k.y, z); k.root.rotation.set(0, ry, 0); k.root.visible = true; if (k.extra) k.extra.visible = true; }
 }
 function updateParked(dt, t) {
   const P = (wind.kn / 18) ** 2, ws = wind.kn * .514;
@@ -1704,7 +1775,7 @@ function updateParked(dt, t) {
       const pitch = -Math.min(.9, k.lift * .8) * smooth(.3, .9, k.lift) * smooth(1.2, 2.2, A) + fl * .05 * k.lift;
       // podniesienie tak, żeby niższa końcówka / krawędź natarcia nie wchodziła pod ziemię
       k.tilt.rotation.set(pitch, 0, roll); k.tilt.position.y = k.span / 2 * Math.sin(Math.abs(roll)) + (pitch < 0 ? k.span * .29 * Math.sin(-pitch) : 0) + .02;
-      if (k.lift > .95) { k.loose = true; k.floating = false; k.vx = wind.down.x * 2.5; k.vz = wind.down.z * 2.5; k.vy = 5; k.spin = 0; k.y += k.span * .35; k.mesh.position.set(0, -.6, .5); }
+      if (k.lift > .95) { if (k.extra) k.extra.visible = false; k.loose = true; k.floating = false; k.vx = wind.down.x * 2.5; k.vz = wind.down.z * 2.5; k.vy = 5; k.spin = 0; k.y += k.span * .35; k.mesh.position.set(0, -.6, .5); }
       continue;
     }
     if (!k.root.visible) continue;
@@ -1787,7 +1858,10 @@ function step(dt, t) {
   for (const s of dyn.students) {
     const d = depthAt(s.x, s.z), y = Math.max(lv, heightAt(s.x, s.z)) - Math.min(.35, Math.max(0, d)) * .6;
     s.body.position.set(s.x, y, s.z); s.inst.position.set(s.x - 1.3, y, s.z - .7); s.inst.rotation.y = .5;
-    const sw = Math.sin(t * .7 + s.ph) * 8, dw = 12 + Math.cos(t * 1.4 + s.ph) * 2, kx = s.x + wind.side.x * sw + wind.down.x * dw, kz = s.z + wind.side.z * sw + wind.down.z * dw, ky = 6.5 + Math.cos(t * 1.4 + s.ph) * 2;
+    s.fly = (s.fly ?? 1) + ((d > .08 ? 1 : 0) - (s.fly ?? 1)) * Math.min(1, dt * .35);                 // brak wody → kite ląduje na krawędzi okna
+    const sw = Math.sin(t * .7 + s.ph) * 8, dw = 12 + Math.cos(t * 1.4 + s.ph) * 2, fl = smooth(0, 1, s.fly), th = .06 + (Math.PI / 2 - .06) * fl * .55;
+    const ex = s.x + wind.side.x * Math.cos(th) * 13, ez = s.z + wind.side.z * Math.cos(th) * 13, ey = y + .4 + Math.sin(th) * 12;
+    const kx = ex + (s.x + wind.side.x * sw + wind.down.x * dw - ex) * fl, kz = ez + (s.z + wind.side.z * sw + wind.down.z * dw - ez) * fl, ky = ey + (6.5 + Math.cos(t * 1.4 + s.ph) * 2 - ey) * fl;
     const tips = flyKite(s.kiteM, s.x, y + 1.1, s.z, kx, ky, kz); setLines(s.lines, _a.set(s.x, y + 1.1, s.z), tips);
   }
   for (const arr of [dyn.surfers, dyn.wingers]) for (const s of arr) {
@@ -1797,6 +1871,7 @@ function step(dt, t) {
   }
   updateParked(dt, t);
   updateZone(dt, t);
+  updateSessions(dt, t);
   updateWorkers(dt, t);
   for (const f of FLOATERS) { f.m.position.y = Math.max(lv + (f.buoy ? .1 : 0) + Math.sin(t * 1.3 + f.ph) * .05, f.minY); if (!f.buoy) f.m.rotation.z = Math.sin(t * .9 + f.ph) * .03; }
   for (const f of FLAGS) {
